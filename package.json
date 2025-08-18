@@ -1,0 +1,25 @@
+{
+  "name": "lastattempt",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "extract:product": "node tools/stagehand_product_extractor.js --url"
+  },
+  "bin": {
+    "stagehand-extract": "tools/stagehand_product_extractor.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "@browserbasehq/stagehand": "^2.4.2",
+    "dotenv": "^16.4.5",
+    "fast-xml-parser": "^5.2.5",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "playwright": "^1.54.2"
+  }
+}

@@ -1,0 +1,44 @@
+# Node
+node_modules/
+npm-debug.log*
+yarn-*.log
+pnpm-debug.log*
+
+# Environment
+.env
+.env.*.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs and caches
+logs/
+*.log
+*.sqlite
+*.db
+action-cache.json
+latest_kickoff_task_outputs.db
+long_term_memory_storage.db
+
+# Build/temporary artifacts
+.tmp/
+tmp/
+
+# Ignore entire vendors folder
+vendors/
+
+# Downloads and generated feeds
+downloads/
+
+# Generated JSON snapshots
+**/*.processing.json
+**/*.output.json
+
+# Project-generated root outputs
+output.json
+
+# Misc
+coverage/
+vendors/
+vendors/
