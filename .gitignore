@@ -26,19 +26,14 @@ long_term_memory_storage.db
 tmp/
 
 # Ignore entire vendors folder
-vendors/
 
 # Downloads and generated feeds
 downloads/
 
 # Generated JSON snapshots
-**/*.processing.json
-**/*.output.json
 
 # Project-generated root outputs
 output.json
 
 # Misc
 coverage/
-vendors/
-vendors/

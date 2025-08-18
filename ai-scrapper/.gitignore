@@ -26,16 +26,11 @@ long_term_memory_storage.db
 tmp/
 
 # Large vendor outputs and backups
-vendors/**/extracted-output/
-vendors/**/product_urls/output/
-vendors/**/back-up/
 
 # Downloads and generated feeds
 downloads/
 
 # Generated JSON snapshots
-**/*.processing.json
-**/*.output.json
 
 # Project-generated root outputs
 output.json
