@@ -4,6 +4,12 @@ const { z } = require('zod');
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
+const cacheManager = require('../utils/cacheManager');
+
+// Import vendor-specific strategies
+const vendorStrategies = {
+    superdrug: require('./superdrug')  // Match the vendor key used in index.js
+};
 
 
 
@@ -28,10 +34,21 @@ function applyImageFallback(item, urlObj) {
 }
 
 function cleanAndValidateUrl(value) {
+    if (typeof value !== 'string') return null;
+    
+    // Check cache first for performance
+    const cached = cacheManager.get('imageValidation', value);
+    if (cached !== undefined) {
+        return cached;
+    }
+    
+    let result = null;
     try {
-        if (typeof value !== 'string') return null;
         let cleaned = value.trim();
-        if (!cleaned) return null;
+        if (!cleaned) {
+            cacheManager.set('imageValidation', value, null);
+            return null;
+        }
         
         // Remove @ prefixes that can get added during extraction
         if (cleaned.startsWith('@')) {
@@ -42,15 +59,21 @@ function cleanAndValidateUrl(value) {
         cleaned = cleaned.replace(/^[^\w]*([a-zA-Z]*:\/\/)/, '$1');
         
         // Exclude non-URL protocols
-        if (/^(data:|blob:|javascript:|mailto:|tel:|#)/i.test(cleaned)) return null;
+        if (/^(data:|blob:|javascript:|mailto:|tel:|#)/i.test(cleaned)) {
+            cacheManager.set('imageValidation', value, null);
+            return null;
+        }
         
         // Try to parse as URL
         const u = new URL(cleaned);
         if (u.protocol === 'http:' || u.protocol === 'https:') {
-            return cleaned;
+            result = cleaned;
         }
-        return null;
+        
+        cacheManager.set('imageValidation', value, result);
+        return result;
     } catch {
+        cacheManager.set('imageValidation', value, null);
         return null;
     }
 }
@@ -62,8 +85,31 @@ function isValidHttpUrl(value) {
 function loadVendorSelectors() {
     try {
         const p = path.resolve(process.cwd(), 'vendor-selectors.json');
-        return JSON.parse(fs.readFileSync(p, 'utf8')) || {};
-    } catch { return {}; }
+        const stats = fs.statSync(p);
+        const lastModified = stats.mtime.getTime();
+        
+        // Use cached version if file hasn't changed
+        const cachedSelectors = cacheManager.get('vendorSelectors');
+        const cachedModifiedTime = cacheManager.get('vendorSelectorsLastModified');
+        
+        if (cachedSelectors && cachedModifiedTime === lastModified) {
+            return cachedSelectors;
+        }
+        
+        // Read and cache the file
+        const data = JSON.parse(fs.readFileSync(p, 'utf8')) || {};
+        cacheManager.set('vendorSelectors', null, data);
+        cacheManager.set('vendorSelectorsLastModified', null, lastModified);
+        return data;
+    } catch { 
+        // Cache empty result to avoid repeated file system calls
+        const cachedSelectors = cacheManager.get('vendorSelectors');
+        if (!cachedSelectors) {
+            cacheManager.set('vendorSelectors', null, {});
+            cacheManager.set('vendorSelectorsLastModified', null, 0);
+        }
+        return {}; 
+    }
 }
 
 function saveVendorSelectors(vendor, partial) {
@@ -74,6 +120,10 @@ function saveVendorSelectors(vendor, partial) {
         const next = { ...prev, ...partial };
         all[vendor] = next;
         fs.writeFileSync(p, JSON.stringify(all, null, 2), 'utf8');
+        
+        // Update cache since file changed
+        cacheManager.set('vendorSelectors', null, all);
+        cacheManager.set('vendorSelectorsLastModified', null, Date.now());
     } catch {}
 }
 
@@ -118,9 +168,9 @@ async function learnAndCacheSelectors(page, vendor, item) {
     const existing = loadVendorSelectors()[vendor];
     
     const learned = {};
-    // Only learn selectors for stable, static fields
-    // Dynamic fields (images, main_image, stock_status) will always use LLM
-    const fieldsToLearn = ['name', 'price', 'weight', 'description', 'category', 'discount'];
+    // Learn selectors for static fields, main_image, and stock_status (which often has consistent patterns)
+    // Truly dynamic fields (images array) will always use LLM
+    const fieldsToLearn = ['name', 'price', 'main_image', 'weight', 'description', 'category', 'discount', 'stock_status'];
     
      
     
@@ -138,7 +188,19 @@ async function learnAndCacheSelectors(page, vendor, item) {
         const value = String(item[field] || '').trim();
         
         try {
-            const observePrompt = `Find the specific element on this page that contains the text "${value}". I need to locate this element for data extraction.`;
+            let observePrompt;
+            if (field === 'main_image') {
+                observePrompt = `Find the main product image element on this page. I need to locate the primary product image for data extraction.`;
+            } else if (field === 'stock_status') {
+                if (value && value.toLowerCase().includes('out of stock')) {
+                    observePrompt = `Find the "out of stock" button, text, or element on this page that indicates the product is unavailable. Look for elements with text like "out of stock", "sold out", "unavailable", or disabled purchase buttons.`;
+                } else {
+                    // Skip learning for "in stock" since it's usually indicated by absence of out-of-stock element
+                    return { field, selector: null, method: 'observe' };
+                }
+            } else {
+                observePrompt = `Find the specific element on this page that contains the text "${value}". I need to locate this element for data extraction.`;
+            }
             
             const observation = await page.observe(observePrompt, { timeout: 5000 });
             
@@ -167,9 +229,32 @@ async function learnAndCacheSelectors(page, vendor, item) {
                 if (selector) {
                     // Validate the observed selector
                     try {
-                        const testText = await page.locator(selector).first().innerText({ timeout: 5000 });
-                        if (testText && (testText.includes(value) || value.includes(testText))) {
-                            return { field, selector, method: 'observe' };
+                        if (field === 'main_image') {
+                            // For main_image, validate by checking src attribute
+                            const testSrc = await page.locator(selector).first().getAttribute('src', { timeout: 5000 });
+                            if (testSrc) {
+                                // Be more lenient with image URL matching - extract filename/path components
+                                const valueFileName = value.split('/').pop()?.split('?')[0] || '';
+                                const testFileName = testSrc.split('/').pop()?.split('?')[0] || '';
+                                if (valueFileName && testFileName && 
+                                    (testSrc.includes(valueFileName) || value.includes(testFileName) || 
+                                     valueFileName === testFileName)) {
+                                    return { field, selector, method: 'observe' };
+                                }
+                            }
+                        } else if (field === 'stock_status') {
+                            // For stock_status, check if the element exists and contains out-of-stock indicators
+                            const testText = await page.locator(selector).first().innerText({ timeout: 5000 });
+                            const isOutOfStock = /out of stock|sold out|unavailable|not available/i.test(testText);
+                            if (isOutOfStock) {
+                                return { field, selector, method: 'observe' };
+                            }
+                        } else {
+                            // For text fields, validate by checking inner text
+                            const testText = await page.locator(selector).first().innerText({ timeout: 5000 });
+                            if (testText && (testText.includes(value) || value.includes(testText))) {
+                                return { field, selector, method: 'observe' };
+                            }
                         }
                     } catch (validationError) {
                         // Observation failed validation
@@ -259,6 +344,79 @@ async function tryExtractWithVendorSelectors(page, vendor, url) {
                     .catch(() => ({ field: 'discount', value: null }))
             );
         }
+        
+        if (sel.main_image) {
+            extractionPromises.push(
+                page.locator(sel.main_image).first().getAttribute('src', { timeout: 10000 })
+                    .then(val => {
+                        const cleanedUrl = val ? cleanAndValidateUrl(val.trim()) : null;
+                        return { field: 'main_image', value: cleanedUrl };
+                    })
+                    .catch(() => ({ field: 'main_image', value: null }))
+            );
+        }
+        
+        if (sel.stock_status) {
+            extractionPromises.push(
+                page.locator(sel.stock_status).first().isVisible({ timeout: 10000 })
+                    .then(isVisible => {
+                        if (isVisible) {
+                            // Element is visible, check if it indicates out of stock
+                            return page.locator(sel.stock_status).first().innerText({ timeout: 5000 })
+                                .then(text => {
+                                    const isOutOfStock = /out of stock|sold out|unavailable|not available/i.test(text);
+                                    return { field: 'stock_status', value: isOutOfStock ? 'Out of stock' : 'In stock' };
+                                })
+                                .catch(() => ({ field: 'stock_status', value: 'Out of stock' })); // Assume out of stock if element exists but can't read text
+                        } else {
+                            // Element not visible = in stock
+                            return { field: 'stock_status', value: 'In stock' };
+                        }
+                    })
+                    .catch(() => {
+                        // Element doesn't exist = in stock
+                        return { field: 'stock_status', value: 'In stock' };
+                    })
+            );
+        }
+        
+        // Extract images using vendor-specific strategy if available
+        if (vendorStrategies[vendor]) {
+            const strategy = vendorStrategies[vendor];
+            // Use the appropriate extraction function based on vendor
+            let extractFunction = null;
+            if (vendor === 'superdrug' && strategy.extractSuperdrugProduct) {
+                extractFunction = strategy.extractSuperdrugProduct;
+            }
+            // Add more vendor-specific extraction functions here as needed
+            
+            if (extractFunction) {
+                extractionPromises.push(
+                    extractFunction(page, { url, vendor })
+                        .then(vendorResult => {
+                            if (vendorResult && vendorResult.images) {
+                                return { field: 'images', value: vendorResult.images };
+                            }
+                            return { field: 'images', value: [] };
+                        })
+                        .catch(() => ({ field: 'images', value: [] }))
+                );
+                
+                // Also extract main_image from vendor strategy if not already extracted by selectors
+                if (!sel.main_image) {
+                    extractionPromises.push(
+                        extractFunction(page, { url, vendor })
+                            .then(vendorResult => {
+                                if (vendorResult && vendorResult.main_image) {
+                                    return { field: 'main_image', value: vendorResult.main_image };
+                                }
+                                return { field: 'main_image', value: null };
+                            })
+                            .catch(() => ({ field: 'main_image', value: null }))
+                    );
+                }
+            }
+        }
       
         // Wait for all extractions to complete in parallel
         const results = await Promise.all(extractionPromises);
@@ -275,6 +433,7 @@ async function tryExtractWithVendorSelectors(page, vendor, url) {
 	return null;
 }
 }
+ 
 
 async function extractGeneric(page, urlObj) {
 	const url = urlObj.url;
@@ -284,15 +443,33 @@ async function extractGeneric(page, urlObj) {
 	const hash = crypto.createHash('sha1').update(`${vendor}|${url}`).digest('hex');
 	const uuid = `${vendor}_${hash}`;
 	const metadata = { uuid, vendor, source_url: url, extracted_at: new Date().toISOString() };
+	
+	// Check URL result cache first (skip for dynamic fields that change frequently)
+	const cacheKey = `${vendor}:${url}`;
+	const cachedResult = cacheManager.get('urlResults', cacheKey);
+	if (cachedResult && !process.env.DISABLE_URL_CACHE) {
+		const age = Date.now() - new Date(cachedResult.extracted_at).getTime();
+		const maxAge = Number(process.env.URL_CACHE_MAX_AGE_HOURS || 24) * 60 * 60 * 1000; // Default 24 hours
+		
+		if (age < maxAge) {
+			console.log(`[URL_CACHE] Using cached result for ${url} (age: ${Math.floor(age / 60000)}min)`);
+			// Update dynamic fields that may have changed
+			return {
+				...cachedResult,
+				extracted_at: new Date().toISOString(), // Update timestamp
+				stock_status: '', // Clear dynamic field - will be re-extracted if needed
+			};
+		}
+	}
 
-	// First try vendor selector shortcuts (no LLM) if configured
-	const direct = await tryExtractWithVendorSelectors(page, vendor, url);
+	// First try direct selector extraction (no LLM) if available
+	const direct =  await tryExtractWithVendorSelectors(page, vendor, url);
 	
 	// Build dynamic schema for only the fields we need from LLM
 	const fieldDefinitions = {
 		name: z.string().describe('The exact product name shown on the page'),
-		main_image: z.string().url().describe('Direct URL to the primary/hero product image'),
-		images: z.array(z.string().url()).describe('All product image URLs'),
+		main_image: z.string().url().describe('Direct URL to the primary/hero product image starting with http:// or https:// (return empty string if no valid image URL found)'),
+		images: z.array(z.string()).describe(`Gallery of product images. Array of ALL product image URLs starting with http:// or https://. (return empty string if no valid image URL found)`),
 		price: z.string().describe('Displayed price text, including currency symbol if shown'),
 		stock_status: z.string().describe('Stock availability status: "In stock" or "Out of stock"'),
 		weight: z.string().describe('Pack size/weight/volume text if available, e.g., 500g or 2x100ml'),
@@ -305,7 +482,8 @@ async function extractGeneric(page, urlObj) {
 	const allFields = Object.keys(fieldDefinitions);
     
 	// Define dynamic fields that should always use LLM (never learn selectors)
-	const dynamicFields = ['images', 'main_image', 'stock_status'];
+	// Note: 'images' is now handled by vendor-specific strategies when available
+	const dynamicFields = [];
 	
 	// Check if we have core fields and if there are any missing fields
 	const hasCore = direct && direct.name && direct.price;
@@ -324,6 +502,7 @@ async function extractGeneric(page, urlObj) {
 			const value = direct[field];
 			const isMissingFromDirect = !value || (typeof value === 'string' && value.trim() === '');
 			const isDynamicField = dynamicFields.includes(field);
+			
 			
 			if (isMissingFromDirect || isDynamicField) {
 				// Always include dynamic fields for LLM extraction
@@ -355,7 +534,7 @@ async function extractGeneric(page, urlObj) {
 			return result;
 		}
 		
-		console.log(`[LEARNING] Extracting ${missingFields.length} missing fields via LLM out of ${allFields.length} fields`);
+		console.log(`[LEARNING] Extracting ${missingFields.join(', ')} missing fields via LLM out of ${allFields.length} fields`);
 	}
 
 
@@ -412,10 +591,16 @@ async function extractGeneric(page, urlObj) {
 	// Handle case where LLM returns element IDs instead of URLs for images array
 	let imagesList = [];
 	if (Array.isArray(images)) {
-		// Filter out element IDs (pattern: "0-78", "17188-17188") and clean/validate URLs
+		// Filter out element IDs and non-URL strings, then clean/validate URLs
 		imagesList = images
 			.filter(img => typeof img === 'string' && img.trim() !== '')
-			.filter(img => !(/^[0-9]+-[0-9]+$/.test(img))) // Remove element IDs
+			.filter(img => {
+				// Remove common element ID patterns and non-URL strings
+				if (/^[0-9]+$/.test(img)) return false; // Pure numbers like "16740"
+				if (/^[0-9]+-[0-9]+$/.test(img)) return false; // Pattern like "0-78", "17188-17188"
+				if (img.length < 10) return false; // Too short to be a valid URL
+				return true;
+			})
 			.map(cleanAndValidateUrl) // Clean and validate URLs (handles @ prefixes)
 			.filter(Boolean); // Keep only valid URLs
 	}
@@ -437,9 +622,9 @@ async function extractGeneric(page, urlObj) {
 		finalProduct = {
 			...llmProduct, // Start with LLM results as base
 			...direct,     // Overlay direct results (they take priority when present)
-			// Always use LLM results for images as they're better processed
-			main_image: mainImage,
-			images: imagesList,
+			// Use direct result for main_image if available, otherwise use LLM result
+			main_image: direct.main_image || mainImage,
+			images: imagesList, // Always use LLM results for images array as it's better processed
 			product_url: url // Ensure URL is always set
 		};
 		 
@@ -488,6 +673,12 @@ async function extractGeneric(page, urlObj) {
 		} catch (error) {
 			console.log(`[LEARNING] Full selector learning failed: ${error.message}`);
 		}
+	}
+	
+	// Cache the result for future use (avoid caching if extraction failed or has errors)
+	if (finalResult && finalResult.name && finalResult.price && !process.env.DISABLE_URL_CACHE) {
+		cacheManager.set('urlResults', cacheKey, finalResult);
+		console.log(`[URL_CACHE] Cached extraction result for ${url}`);
 	}
 	
 	return finalResult;

@@ -245,8 +245,8 @@ class SessionManager {
             apiKey: process.env.BROWSERBASE_API_KEY,
             projectId: process.env.BROWSERBASE_PROJECT_ID,
             waitForCaptchaSolves: true,
-            modelName: 'gpt-4o',
-            modelClientOptions: { apiKey: process.env.OPENAI_API_KEY },
+            modelName: 'google/gemini-2.5-pro',
+            modelClientOptions: { apiKey: process.env.GOOGLE_API_KEY },
             domSettleTimeoutMs: 3000, // Wait longer for DOM to settle
         };
         if (local) {
