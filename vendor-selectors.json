@@ -1,7 +1,7 @@
 {
   "superdrug": {
     "last_llm_extraction": {
-      "timestamp": "2025-08-18T16:38:03.481Z",
+      "timestamp": "2025-08-18T18:34:28.505Z",
       "attempted_fields": [
         "name",
         "main_image",
@@ -35,7 +35,7 @@
           "value_type": "string"
         },
         "weight": {
-          "found": false,
+          "found": true,
           "value_type": "string"
         },
         "description": {
