@@ -12,6 +12,7 @@ try { require('dotenv').config(); } catch { }
 const { z } = require('zod');
 const { withFileLock, removeUrlsFromProcessingFile, updateErrorsInProcessingFile, prepareProcessing, cleanupProcessingFile } = require('./utils/resume');
 const SessionManager = require('./utils/sessionManager');
+const cacheManager = require('./utils/cacheManager');
 // Load Stagehand in a way that works for both ESM and CJS builds
 async function loadStagehandCtor() {
     const mod = await import('@browserbasehq/stagehand');
@@ -530,6 +531,18 @@ async function main() {
             const seconds = (ms / 1000).toFixed(2);
             console.log(`Total duration: ${seconds}s`);
         }
+        
+        // Display cache statistics
+        const cacheStats = cacheManager.getStats();
+        console.log('\n📊 Cache Performance Summary:');
+        Object.entries(cacheStats).forEach(([cacheName, stats]) => {
+            if (stats.size !== undefined) {
+                const hitRatePercent = (stats.hitRate * 100).toFixed(1);
+                console.log(`  ${cacheName}: ${stats.size}/${stats.maxSize} entries (~${hitRatePercent}% est. hit rate)`);
+            } else {
+                console.log(`  ${cacheName}: ${stats.cached ? 'cached' : 'not cached'} (${stats.type})`);
+            }
+        });
     }
 }
 

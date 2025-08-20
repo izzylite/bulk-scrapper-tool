@@ -35,8 +35,8 @@ async function extractSitemapUrls() {
             verbose: 0,
             apiKey: process.env.BROWSERBASE_API_KEY,
             projectId: process.env.BROWSERBASE_PROJECT_ID,
-            modelName: 'gpt-4o',
-            modelClientOptions: { apiKey: process.env.OPENAI_API_KEY },
+            modelName: 'google/gemini-2.5-pro',
+            modelClientOptions: { apiKey: process.env.GOOGLE_API_KEY },
             browserbaseSessionCreateParams: {
                 projectId: process.env.BROWSERBASE_PROJECT_ID,
                 browserSettings: {

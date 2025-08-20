@@ -4,6 +4,11 @@
 const fs = require('fs');
 const path = require('path');
 const { XMLParser } = require('fast-xml-parser');
+const {
+    getHostnameFromUrl,
+    resolveExclusionsForHostname,
+    createExclusionFilter
+} = require('../../tools/utils/exclusion');
 
 function parseArgs(argv) {
     const args = { input: '', output: '', limit: 0, directory: '', combined: false };
@@ -60,13 +65,38 @@ function parseArgs(argv) {
     return args;
 }
 
+function extractSkuFromUrl(url) {
+    // Extract SKU ID from URL pattern: .../p/{SKU_ID}
+    const match = url.match(/\/p\/([^\/\?#]+)/);
+    return match ? match[1] : null;
+}
+
+function detectFirstUrlFromXml(xmlContent) {
+    // Extract first URL from XML to determine hostname for exclusions
+    const firstUrlMatch = xmlContent.match(/<loc>(.*?)<\/loc>/);
+    return firstUrlMatch ? firstUrlMatch[1].trim() : null;
+}
+
 function extractUrlsAndImages(xmlContent) {
     // First, let's try to clean up the XML content and check its validity
     console.log('XML content length:', xmlContent.length);
     console.log('First 500 chars:', xmlContent.substring(0, 500));
     
+    // Setup exclusion filtering
+    const firstUrl = detectFirstUrlFromXml(xmlContent);
+    const hostname = getHostnameFromUrl(firstUrl);
+    const exclusions = resolveExclusionsForHostname(hostname);
+    const exclusionFilter = createExclusionFilter(exclusions);
+    
+    if (exclusions && exclusions.length > 0) {
+        console.log(`[EXCLUSION] Applying exclusion filters for ${hostname}: [${exclusions.map(e => `"${e}"`).join(', ')}]`);
+    }
+    
     // Use a simpler regex-based approach for large XML files
     const extracted = [];
+    const seenSkus = new Set(); // Track unique SKU IDs
+    let duplicateCount = 0;
+    let excludedCount = 0;
     
     // Split into URL blocks
     const urlBlocks = xmlContent.split('<url>').slice(1); // Skip the first empty part
@@ -81,6 +111,28 @@ function extractUrlsAndImages(xmlContent) {
         
         const url = locMatch[1].trim();
         
+        // Apply exclusion filter
+        if (exclusionFilter && !exclusionFilter(url)) {
+            excludedCount++;
+            continue; // Skip excluded URL
+        }
+        
+        // Extract SKU ID from URL
+        const skuId = extractSkuFromUrl(url);
+        if (!skuId) {
+            console.log(`Warning: Could not extract SKU from URL: ${url}`);
+            continue;
+        }
+        
+        // Check for duplicate SKU
+        if (seenSkus.has(skuId)) {
+            duplicateCount++;
+            continue; // Skip duplicate SKU
+        }
+        
+        // Mark this SKU as seen
+        seenSkus.add(skuId);
+        
         // Extract image URL
         const imageMatch = block.match(/<image:loc>(.*?)<\/image:loc>/);
         const imageUrl = imageMatch ? imageMatch[1].trim() : null;
@@ -92,6 +144,7 @@ function extractUrlsAndImages(xmlContent) {
         
         const item = {
             url: url,
+            sku_id: skuId,
             image_url: imageUrl,
             lastmod: lastmodMatch ? lastmodMatch[1].trim() : null,
             changefreq: changefreqMatch ? changefreqMatch[1].trim() : null,
@@ -102,11 +155,17 @@ function extractUrlsAndImages(xmlContent) {
         
         // Log progress for every 10000 items
         if ((i + 1) % 10000 === 0) {
-            console.log(`Processed ${i + 1} URL blocks...`);
+            console.log(`Processed ${i + 1} URL blocks... (${duplicateCount} duplicates, ${excludedCount} excluded)`);
         }
     }
     
-    return extracted;
+    console.log(`\nExtraction complete:`);
+    console.log(`- Unique URLs extracted: ${extracted.length}`);
+    console.log(`- Duplicates skipped: ${duplicateCount}`);
+    console.log(`- Excluded URLs: ${excludedCount}`);
+    console.log(`- Total URLs processed: ${extracted.length + duplicateCount + excludedCount}`);
+    
+    return { items: extracted, duplicateCount: duplicateCount, excludedCount: excludedCount };
 }
 
 function findXmlFiles(directory) {
@@ -124,7 +183,10 @@ function processXmlFile(filePath, limit) {
     const xmlContent = fs.readFileSync(filePath, 'utf8');
     console.log('Parsing XML and extracting URLs and images...');
     
-    const extracted = extractUrlsAndImages(xmlContent);
+    const result = extractUrlsAndImages(xmlContent);
+    const extracted = result.items;
+    const duplicateCount = result.duplicateCount;
+    const excludedCount = result.excludedCount;
     
     let finalData = extracted;
     if (limit > 0 && extracted.length > limit) {
@@ -134,7 +196,7 @@ function processXmlFile(filePath, limit) {
         console.log(`Extracted ${extracted.length} URL entries`);
     }
     
-    return finalData;
+    return { items: finalData, duplicateCount: duplicateCount, excludedCount: excludedCount };
 }
 
 function processDirectory(directoryPath, outputPath, limit, combined) {
@@ -162,11 +224,30 @@ function processDirectory(directoryPath, outputPath, limit, combined) {
         // Combined output: process all files and merge results
         let allExtracted = [];
         let totalWithImages = 0;
+        let totalDuplicates = 0;
+        let totalExcluded = 0;
+        const globalSeenSkus = new Set(); // Track SKUs across all files
+        let crossFileDuplicates = 0;
         
         for (const xmlFile of xmlFiles) {
-            const extracted = processXmlFile(xmlFile, 0); // No limit per file when combining
-            allExtracted = allExtracted.concat(extracted);
-            totalWithImages += extracted.filter(item => item.image_url).length;
+            const result = processXmlFile(xmlFile, 0); // No limit per file when combining
+            const extracted = result.items;
+            totalDuplicates += result.duplicateCount;
+            totalExcluded += result.excludedCount;
+            
+            // Check for duplicates across files
+            const filteredItems = [];
+            for (const item of extracted) {
+                if (globalSeenSkus.has(item.sku_id)) {
+                    crossFileDuplicates++;
+                } else {
+                    globalSeenSkus.add(item.sku_id);
+                    filteredItems.push(item);
+                }
+            }
+            
+            allExtracted = allExtracted.concat(filteredItems);
+            totalWithImages += filteredItems.filter(item => item.image_url).length;
         }
         
         // Apply global limit if specified
@@ -182,6 +263,7 @@ function processDirectory(directoryPath, outputPath, limit, combined) {
         // Create simplified data and output object
         const simplifiedData = finalData.map(item => ({
             url: item.url,
+            sku_id: item.sku_id,
             image_url: item.image_url
         }));
         
@@ -194,16 +276,24 @@ function processDirectory(directoryPath, outputPath, limit, combined) {
         fs.writeFileSync(combinedOutputPath, JSON.stringify(outputData, null, 2), 'utf8');
         console.log(`\n=== COMBINED RESULTS ===`);
         console.log(`Combined data saved to: ${combinedOutputPath}`);
-        console.log(`- Total URLs: ${finalData.length}`);
+        console.log(`- Final unique URLs: ${finalData.length}`);
         console.log(`- URLs with images: ${finalData.filter(item => item.image_url).length}`);
         console.log(`- Source files: ${xmlFiles.length}`);
+        console.log(`\n=== FILTERING STATISTICS ===`);
+        console.log(`- Within-file duplicates: ${totalDuplicates}`);
+        console.log(`- Cross-file duplicates: ${crossFileDuplicates}`);
+        console.log(`- Total duplicates removed: ${totalDuplicates + crossFileDuplicates}`);
+        console.log(`- Excluded URLs (categories): ${totalExcluded}`);
         
     } else {
         // Separate output: process each file individually
         const results = [];
         
         for (const xmlFile of xmlFiles) {
-            const extracted = processXmlFile(xmlFile, limit);
+            const result = processXmlFile(xmlFile, limit);
+            const extracted = result.items;
+            const duplicateCount = result.duplicateCount;
+            const excludedCount = result.excludedCount;
             
             // Generate output path for this file
             const inputName = path.basename(xmlFile, path.extname(xmlFile));
@@ -212,23 +302,29 @@ function processDirectory(directoryPath, outputPath, limit, combined) {
             // Create simplified data and output object
             const simplifiedData = extracted.map(item => ({
                 url: item.url,
+                sku_id: item.sku_id,
                 image_url: item.image_url
             }));
             
             const outputData = {
                 total_count: extracted.length,
                 source_file: path.basename(xmlFile),
+                duplicates_removed: duplicateCount,
+                excluded_count: excludedCount,
                 items: simplifiedData
             };
             
             fs.writeFileSync(fileOutputPath, JSON.stringify(outputData, null, 2), 'utf8');
             console.log(`Data saved to: ${fileOutputPath}`);
+            console.log(`- Unique URLs: ${extracted.length}, Duplicates: ${duplicateCount}, Excluded: ${excludedCount}`);
             
             const withImages = extracted.filter(item => item.image_url).length;
             results.push({
                 file: path.basename(xmlFile),
                 totalUrls: extracted.length,
                 withImages: withImages,
+                duplicatesRemoved: duplicateCount,
+                excludedCount: excludedCount,
                 outputPath: fileOutputPath
             });
         }
@@ -238,19 +334,27 @@ function processDirectory(directoryPath, outputPath, limit, combined) {
         console.log(`Processed ${xmlFiles.length} XML files:`);
         let grandTotal = 0;
         let grandTotalWithImages = 0;
+        let grandTotalDuplicates = 0;
+        let grandTotalExcluded = 0;
         
         results.forEach((result, idx) => {
             console.log(`${idx + 1}. ${result.file}:`);
-            console.log(`   - URLs: ${result.totalUrls}`);
+            console.log(`   - Unique URLs: ${result.totalUrls}`);
             console.log(`   - With images: ${result.withImages}`);
+            console.log(`   - Duplicates removed: ${result.duplicatesRemoved}`);
+            console.log(`   - Excluded: ${result.excludedCount}`);
             console.log(`   - Output: ${path.basename(result.outputPath)}`);
             grandTotal += result.totalUrls;
             grandTotalWithImages += result.withImages;
+            grandTotalDuplicates += result.duplicatesRemoved;
+            grandTotalExcluded += result.excludedCount;
         });
         
         console.log(`\nGrand Total:`);
-        console.log(`- URLs: ${grandTotal}`);
+        console.log(`- Unique URLs: ${grandTotal}`);
         console.log(`- With images: ${grandTotalWithImages}`);
+        console.log(`- Total duplicates removed: ${grandTotalDuplicates}`);
+        console.log(`- Total excluded: ${grandTotalExcluded}`);
     }
 }
 
@@ -312,7 +416,10 @@ function main() {
         const xmlContent = fs.readFileSync(inputPath, 'utf8');
         
         console.log('Parsing XML and extracting URLs and images...');
-        const extracted = extractUrlsAndImages(xmlContent);
+        const result = extractUrlsAndImages(xmlContent);
+        const extracted = result.items;
+        const duplicateCount = result.duplicateCount;
+        const excludedCount = result.excludedCount;
         
         let finalData = extracted;
         if (limit > 0 && extracted.length > limit) {
@@ -340,16 +447,19 @@ function main() {
             outputPath = path.join(outputDir, `${inputName}.json`);
         }
         
-        // Create simple format with url and image_url only
+        // Create simple format with url, sku_id, and image_url
         const simplifiedData = finalData.map(item => ({
             url: item.url,
+            sku_id: item.sku_id,
             image_url: item.image_url
         }));
         
-        // Create output object with total_count
+        // Create output object with total_count, duplicate, and exclusion info
         const outputData = {
             total_count: finalData.length,
             source_file: path.basename(inputPath),
+            duplicates_removed: duplicateCount,
+            excluded_count: excludedCount,
             items: simplifiedData
         };
         
@@ -360,9 +470,11 @@ function main() {
         // Log some statistics
         const withImages = finalData.filter(item => item.image_url).length;
         console.log(`\nStatistics:`);
-        console.log(`- Total URLs: ${finalData.length}`);
+        console.log(`- Unique URLs: ${finalData.length}`);
         console.log(`- URLs with images: ${withImages}`);
         console.log(`- URLs without images: ${finalData.length - withImages}`);
+        console.log(`- Duplicates removed: ${duplicateCount}`);
+        console.log(`- Excluded URLs: ${excludedCount}`);
         
         if (finalData.length > 0) {
             console.log(`\nFirst few URLs:`);
@@ -381,6 +493,8 @@ if (require.main === module) {
 }
 
 module.exports = { 
+    extractSkuFromUrl,
+    detectFirstUrlFromXml,
     extractUrlsAndImages, 
     findXmlFiles, 
     processXmlFile, 
