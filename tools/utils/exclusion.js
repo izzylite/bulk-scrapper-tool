@@ -9,6 +9,7 @@
 const DOMAIN_EXCLUSIONS = {
 	"harrods.com": [],
 	"superdrug.com": ["fashion","health"],
+	
 };
 
 function getHostnameFromUrl(url) {

@@ -4,7 +4,7 @@ const { z } = require('zod');
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
-const cacheManager = require('../utils/cacheManager');
+const cacheManager = require('../utils/cache/cacheManager');
 
 // Import vendor-specific strategies
 const vendorStrategies = {
@@ -84,7 +84,7 @@ function isValidHttpUrl(value) {
 
 function loadVendorSelectors() {
     try {
-        const p = path.resolve(process.cwd(), 'vendor-selectors.json');
+        const p = path.resolve(process.cwd(), 'tools/utils/cache/vendor-selectors.json');
         const stats = fs.statSync(p);
         const lastModified = stats.mtime.getTime();
         
@@ -114,22 +114,95 @@ function loadVendorSelectors() {
 
 function saveVendorSelectors(vendor, partial) {
     try {
-        const p = path.resolve(process.cwd(), 'vendor-selectors.json');
+        const p = path.resolve(process.cwd(), 'tools/utils/cache/vendor-selectors.json');
         const all = loadVendorSelectors();
         const prev = all[vendor] || {};
-        const next = { ...prev, ...partial };
-        all[vendor] = next;
+        
+        // Handle both old format (direct fields) and new format (selectors array)
+        if (partial.selectors) {
+            // New format: append to selector arrays instead of overriding
+            if (!prev.selectors) prev.selectors = {};
+            
+            for (const [field, newSelector] of Object.entries(partial.selectors)) {
+                // Initialize field array if it doesn't exist
+                if (!prev.selectors[field]) {
+                    prev.selectors[field] = [];
+                } else if (!Array.isArray(prev.selectors[field])) {
+                    // Convert non-array to array format
+                    console.log(`[SELECTOR-SAVE] Converting ${vendor}.${field} from string to array format`);
+                    const oldSelector = prev.selectors[field];
+                    prev.selectors[field] = [{
+                        selector: typeof oldSelector === 'string' ? oldSelector : oldSelector.selector || oldSelector,
+                        type: (typeof oldSelector === 'string' ? oldSelector : oldSelector.selector || oldSelector).startsWith('xpath=') ? 'xpath' : 'css',
+                        learned_at: new Date().toISOString(),
+                        success_count: 0,
+                        failure_count: 0,
+                        last_success: null,
+                        last_failure: null,
+                        confidence_score: 1.0
+                    }];
+                }
+                
+                // Check if this selector already exists
+                const selectorString = typeof newSelector === 'string' ? newSelector : newSelector.selector;
+                const existingIndex = prev.selectors[field].findIndex(s => 
+                    (s.selector || s) === selectorString
+                );
+                
+                if (existingIndex >= 0) {
+                    // Update existing selector
+                    if (typeof newSelector === 'object') {
+                        prev.selectors[field][existingIndex] = { ...prev.selectors[field][existingIndex], ...newSelector };
+                    }
+                } else {
+                    // Add new selector
+                    const selectorObj = typeof newSelector === 'string' ? {
+                        selector: newSelector,
+                        type: newSelector.startsWith('xpath=') ? 'xpath' : 'css',
+                        learned_at: new Date().toISOString(),
+                        success_count: 0,
+                        failure_count: 0,
+                        last_success: null,
+                        last_failure: null,
+                        confidence_score: 1.0
+                    } : newSelector;
+                    
+                    prev.selectors[field].push(selectorObj);
+                    console.log(`[SELECTOR-HISTORY] Added new ${field} selector for ${vendor}: ${selectorString}`);
+                }
+            }
+            
+            all[vendor] = { ...prev, ...partial };
+        } else {
+            // Old format: convert to new format
+            const selectorsToAdd = {};
+            for (const [field, selector] of Object.entries(partial)) {
+                if (field !== 'last_llm_extraction') {
+                    selectorsToAdd[field] = selector;
+                }
+            }
+            
+            if (Object.keys(selectorsToAdd).length > 0) {
+                saveVendorSelectors(vendor, { selectors: selectorsToAdd });
+                return;
+            }
+            
+            all[vendor] = { ...prev, ...partial };
+        }
+        
         fs.writeFileSync(p, JSON.stringify(all, null, 2), 'utf8');
         
         // Update cache since file changed
         cacheManager.set('vendorSelectors', null, all);
         cacheManager.set('vendorSelectorsLastModified', null, Date.now());
-    } catch {}
+    } catch (error) {
+        console.log(`[SELECTOR-SAVE] Failed to save vendor selectors: ${error.message}`);
+    }
 }
 
 function updateExtractionSnapshot(vendor, attemptedFields, extractedData) {
     try {
-        const p = path.resolve(process.cwd(), 'vendor-selectors.json');
+        const p = path.resolve(process.cwd(), 'tools/utils/cache/vendor-selectors.json');
         const all = loadVendorSelectors();
         if (!all[vendor]) all[vendor] = {};
         
@@ -287,97 +360,72 @@ async function tryExtractWithVendorSelectors(page, vendor, url) {
 	 
     try {
         const all = loadVendorSelectors();
-        const sel = all[vendor];
-        if (!sel) return null;
+        const vendorData = all[vendor];
+        if (!vendorData) return null;
+        
+        // Support both old format (direct selectors) and new format (selector arrays)
+        const selectors = vendorData.selectors || vendorData; // New format has 'selectors' key
+        if (!selectors) return null;
         
         const result = { product_url: url };
         
         // Extract all fields in parallel for much better performance
         const extractionPromises = [];
         
-        if (sel.name) {
-            extractionPromises.push(
-                page.locator(sel.name).first().innerText({ timeout: 10000 })
-                    .then(val => ({ field: 'name', value: val.trim() }))
-                    .catch(() => ({ field: 'name', value: null }))
-            );
-        }
-        
-        if (sel.price) {
-            extractionPromises.push(
-                page.locator(sel.price).first().innerText({ timeout: 10000 })
-                    .then(val => ({ field: 'price', value: val.trim() }))
-                    .catch(() => ({ field: 'price', value: null }))
-            );
-        }
-        
-       
-        
-        if (sel.weight) {
-            extractionPromises.push(
-                page.locator(sel.weight).first().innerText({ timeout: 10000 })
-                    .then(val => ({ field: 'weight', value: val.trim() }))
-                    .catch(() => ({ field: 'weight', value: null }))
-            );
-        }
-        
-        if (sel.description) {
-            extractionPromises.push(
-                page.locator(sel.description).first().innerText({ timeout: 10000 })
-                    .then(val => ({ field: 'description', value: val.trim() }))
-                    .catch(() => ({ field: 'description', value: null }))
-            );
-        }
-        
-        if (sel.category) {
-            extractionPromises.push(
-                page.locator(sel.category).first().innerText({ timeout: 10000 })
-                    .then(val => ({ field: 'category', value: val.trim() }))
-                    .catch(() => ({ field: 'category', value: null }))
-            );
-        }
-        
-        if (sel.discount) {
-            extractionPromises.push(
-                page.locator(sel.discount).first().innerText({ timeout: 10000 })
-                    .then(val => ({ field: 'discount', value: val.trim() }))
-                    .catch(() => ({ field: 'discount', value: null }))
-            );
-        }
-        
-        if (sel.main_image) {
-            extractionPromises.push(
-                page.locator(sel.main_image).first().getAttribute('src', { timeout: 10000 })
-                    .then(val => {
-                        const cleanedUrl = val ? cleanAndValidateUrl(val.trim()) : null;
-                        return { field: 'main_image', value: cleanedUrl };
-                    })
-                    .catch(() => ({ field: 'main_image', value: null }))
-            );
-        }
-        
-        if (sel.stock_status) {
-            extractionPromises.push(
-                page.locator(sel.stock_status).first().isVisible({ timeout: 10000 })
-                    .then(isVisible => {
+        // Helper function to try multiple selectors for a field
+        const tryFieldSelectors = async (field, selectorList) => {
+            if (!selectorList) return { field, value: null, successfulSelector: null };
+            
+            // Handle both old format (string) and new format (array)
+            const selectors = Array.isArray(selectorList) ? selectorList : [{ selector: selectorList, confidence_score: 1.0 }];
+            
+            // Sort by confidence score (highest first)
+            const sortedSelectors = selectors.sort((a, b) => (b.confidence_score || 0) - (a.confidence_score || 0));
+            
+            for (const selectorObj of sortedSelectors) {
+                const selectorString = selectorObj.selector || selectorObj;
+                try {
+                    let value;
+                    if (field === 'main_image') {
+                        value = await page.locator(selectorString).first().getAttribute('src', { timeout: 10000 });
+                        value = value ? cleanAndValidateUrl(value.trim()) : null;
+                    } else if (field === 'stock_status') {
+                        const isVisible = await page.locator(selectorString).first().isVisible({ timeout: 10000 });
                         if (isVisible) {
-                            // Element is visible, check if it indicates out of stock
-                            return page.locator(sel.stock_status).first().innerText({ timeout: 5000 })
-                                .then(text => {
-                                    const isOutOfStock = /out of stock|sold out|unavailable|not available/i.test(text);
-                                    return { field: 'stock_status', value: isOutOfStock ? 'Out of stock' : 'In stock' };
-                                })
-                                .catch(() => ({ field: 'stock_status', value: 'Out of stock' })); // Assume out of stock if element exists but can't read text
+                            const text = await page.locator(selectorString).first().innerText({ timeout: 5000 });
+                            const isOutOfStock = /out of stock|sold out|unavailable|not available/i.test(text);
+                            value = isOutOfStock ? 'Out of stock' : 'In stock';
                         } else {
-                            // Element not visible = in stock
-                            return { field: 'stock_status', value: 'In stock' };
+                            value = 'In stock';
                         }
-                    })
-                    .catch(() => {
-                        // Element doesn't exist = in stock
-                        return { field: 'stock_status', value: 'In stock' };
-                    })
-            );
+                    } else {
+                        value = await page.locator(selectorString).first().innerText({ timeout: 10000 });
+                        value = value ? value.trim() : null;
+                    }
+                    
+                    if (value) {
+                        // Success! Update statistics and return
+                        await updateSelectorStatistics(vendor, field, selectorObj, true);
+                        return { field, value, successfulSelector: selectorObj };
+                    }
+                } catch (error) {
+                    // This selector failed, try the next one
+                    await updateSelectorStatistics(vendor, field, selectorObj, false);
+                    continue;
+                }
+            }
+            
+            return { field, value: null, successfulSelector: null };
+        };
+        
+        // Extract all standard fields using the new multi-selector approach
+        const fieldNames = ['name', 'price', 'weight', 'description', 'category', 'discount', 'main_image', 'stock_status'];
+        
+        for (const field of fieldNames) {
+            const selectorList = selectors[field];
+            if (selectorList) {
+                extractionPromises.push(tryFieldSelectors(field, selectorList));
+            }
         }
         
         // Extract images using vendor-specific strategy if available
@@ -403,7 +451,7 @@ async function tryExtractWithVendorSelectors(page, vendor, url) {
                 );
                 
                 // Also extract main_image from vendor strategy if not already extracted by selectors
-                if (!sel.main_image) {
+                if (!selectors.main_image) {
                     extractionPromises.push(
                         extractFunction(page, { url, vendor })
                             .then(vendorResult => {
@@ -422,9 +470,9 @@ async function tryExtractWithVendorSelectors(page, vendor, url) {
         const results = await Promise.all(extractionPromises);
         
         // Apply results to the result object
-        for (const { field, value } of results) {
-            if (value !== null) {
-                result[field] = value;
+        for (const result of results) {
+            if (result && result.field && result.value !== null) {
+                result[result.field] = result.value;
             }
         }
         
@@ -678,10 +726,104 @@ async function extractGeneric(page, urlObj) {
 	// Cache the result for future use (avoid caching if extraction failed or has errors)
 	if (finalResult && finalResult.name && finalResult.price && !process.env.DISABLE_URL_CACHE) {
 		cacheManager.set('urlResults', cacheKey, finalResult);
-		console.log(`[URL_CACHE] Cached extraction result for ${url}`);
+		console.log(`[URL_CACHE] Cached extraction result for ${urlObj.sku || "url"}`);
 	}
 	
 	return finalResult;
+}
+
+// Update selector statistics and confidence scores
+async function updateSelectorStatistics(vendor, field, selectorObj, success) {
+    try {
+        const all = loadVendorSelectors();
+        if (!all[vendor]) return;
+        
+        // Handle both old format (direct selectors) and new format (selector arrays)
+        let selectors;
+        if (all[vendor].selectors && all[vendor].selectors[field]) {
+            // New format: array of selector objects
+            selectors = all[vendor].selectors[field];
+            if (!Array.isArray(selectors)) {
+                console.log(`[SELECTOR-STATS] Warning: ${vendor}.${field} selectors is not an array, converting...`);
+                // Convert single selector to array format
+                const singleSelector = typeof selectors === 'string' ? selectors : selectors.selector;
+                selectors = [{
+                    selector: singleSelector,
+                    type: singleSelector.startsWith('xpath=') ? 'xpath' : 'css',
+                    learned_at: new Date().toISOString(),
+                    success_count: 0,
+                    failure_count: 0,
+                    last_success: null,
+                    last_failure: null,
+                    confidence_score: 1.0
+                }];
+                all[vendor].selectors[field] = selectors;
+            }
+        } else if (all[vendor][field]) {
+            // Old format: direct field with selector string
+            console.log(`[SELECTOR-STATS] Converting old format ${vendor}.${field} to new format`);
+            const oldSelector = all[vendor][field];
+            selectors = [{
+                selector: oldSelector,
+                type: oldSelector.startsWith('xpath=') ? 'xpath' : 'css',
+                learned_at: new Date().toISOString(),
+                success_count: 0,
+                failure_count: 0,
+                last_success: null,
+                last_failure: null,
+                confidence_score: 1.0
+            }];
+            
+            // Migrate to new format
+            if (!all[vendor].selectors) all[vendor].selectors = {};
+            all[vendor].selectors[field] = selectors;
+            delete all[vendor][field]; // Remove old format field
+        } else {
+            // No selectors found for this field
+            return;
+        }
+        
+        const selectorString = selectorObj.selector || selectorObj;
+        const selectorIndex = selectors.findIndex(s => s.selector === selectorString);
+        
+        if (selectorIndex >= 0) {
+            const selector = selectors[selectorIndex];
+            const now = new Date().toISOString();
+            
+            if (success) {
+                selector.success_count = (selector.success_count || 0) + 1;
+                selector.last_success = now;
+                console.log(`[SELECTOR-STATS] ${vendor}.${field} selector success (${selector.success_count} total)`);
+            } else {
+                selector.failure_count = (selector.failure_count || 0) + 1;
+                selector.last_failure = now;
+                console.log(`[SELECTOR-STATS] ${vendor}.${field} selector failed (${selector.failure_count} total failures)`);
+            }
+            
+            // Calculate confidence score (success rate with recency bias)
+            const totalAttempts = selector.success_count + selector.failure_count;
+            const baseConfidence = totalAttempts > 0 ? selector.success_count / totalAttempts : 0.5;
+            
+            // Add recency bias - recent successes get higher confidence
+            const daysSinceLastSuccess = selector.last_success ? 
+                (new Date() - new Date(selector.last_success)) / (1000 * 60 * 60 * 24) : 365;
+            const recencyBonus = Math.max(0, 0.2 - (daysSinceLastSuccess * 0.01)); // Bonus decreases over time
+            
+            selector.confidence_score = Math.min(1.0, baseConfidence + recencyBonus);
+            
+            // Save the updated statistics
+            const p = path.resolve(process.cwd(), 'tools/utils/cache/vendor-selectors.json');
+            fs.writeFileSync(p, JSON.stringify(all, null, 2));
+            
+            // Update cache
+            cacheManager.set('vendorSelectors', null, all);
+            cacheManager.set('vendorSelectorsLastModified', null, Date.now());
+        } else {
+            console.log(`[SELECTOR-STATS] Warning: Selector not found in ${vendor}.${field} array: ${selectorString}`);
+        }
+    } catch (error) {
+        console.log(`[SELECTOR-STATS] Failed to update statistics: ${error.message}`);
+    }
 }
 
 module.exports = { extractGeneric };

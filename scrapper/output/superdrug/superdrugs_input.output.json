@@ -1,0 +1,538 @@
+{
+  "vendor": "superdrug",
+  "source_file": "superdrug_2025-08-20T23-09-58-424Z.json",
+  "created_at": "2025-08-20T23:09:58.803Z",
+  "updated_at": "2025-08-21T00:20:26.639Z",
+  "total_items": 28,
+  "items": [
+    {
+      "uuid": "superdrug_2a1035289db347de5ffd6dc885798a86d7c7964c",
+      "vendor": "superdrug",
+      "source_url": "https://www.superdrug.com/make-up/face/foundation/full-foundation/lola-make-up-cream-foundation-b018-extra-dark/p/mp-00000856",
+      "extracted_at": "2025-08-20T23:13:30.482Z",
+      "product_url": "https://www.superdrug.com/make-up/face/foundation/full-foundation/lola-make-up-cream-foundation-b018-extra-dark/p/mp-00000856",
+      "name": "LOLA MAKE UP Cream Foundation B018 Extra Dark",
+      "price": "£15.95",
+      "weight": "LOLA MAKE UP Cream Foundation B018 Extra Dark",
+      "description": "Triple function make up cream, oil free. Offers a peachy finish and control of the production of tallow due to its formula enriched with vitamins and new micronized powder. SPF15.",
+      "category": "FOUNDATION",
+      "discount": "10% off Student Discount",
+      "main_image": "https://media.superdrug.com//medias/prd-front-mp-00000856-600x600?context=bWFzdGVyfHByZC1pbWFnZXN8NTUyNjh8aW1hZ2UvanBlZ3xhRE16TDJoaU1DODVORE0wTWpnM01qUXpNamswTDNCeVpDMW1jbTl1ZEMxdGNDMHdNREF3TURnMU5sODJNREI0TmpBd3xkOGFhYTRkMWZjNTMxZmVjYjIwOTEyOTQyZjUyMmFhZTY2YTc5MmVlZTM1NGE5NmU2NTcyOTYzNzE3ODBmODFh",
+      "stock_status": "Out of stock",
+      "images": [
+        "https://media.superdrug.com//medias/prd-front-mp-00000856-600x600?context=bWFzdGVyfHByZC1pbWFnZXN8NTUyNjh8aW1hZ2UvanBlZ3xhRE16TDJoaU1DODVORE0wTWpnM01qUXpNamswTDNCeVpDMW1jbTl1ZEMxdGNDMHdNREF3TURnMU5sODJNREI0TmpBd3xkOGFhYTRkMWZjNTMxZmVjYjIwOTEyOTQyZjUyMmFhZTY2YTc5MmVlZTM1NGE5NmU2NTcyOTYzNzE3ODBmODFh"
+      ]
+    },
+    {
+      "uuid": "superdrug_174f81634c84da815df0316881bb98c0addbb87e",
+      "vendor": "superdrug",
+      "source_url": "https://www.superdrug.com/skin/skincare-gift-sets/dr-eve-ryouth-vitamin-c-serum-peptide-serum/p/mp-00009784",
+      "extracted_at": "2025-08-20T23:13:34.874Z",
+      "product_id": "mp-00009784",
+      "name": "Dr. Eve_Ryouth Vitamin C Serum + Peptide serum",
+      "main_image": "https://media.superdrug.com//medias/prd-front-mp-00009784-600x600?context=bWFzdGVyfHByZC1pbWFnZXN8MzY3Njl8aW1hZ2UvanBlZ3xhR0prTDJneVpTODVOVFkwTURReE1UVXdORGswTDNCeVpDMW1jbTl1ZEMxdGNDMHdNREF3T1RjNE5GODJNREI0TmpBd3xlNWZhNDI4MjdlY2RlMTU0Nzg3MWY5NGZkNDUwYmNiNGEzZjcyMDZhODlkNTZlMTJiNmIzYWU3MzI0NzIzYTJi",
+      "images": [
+        "https://media.superdrug.com/medias/?context=bWFzdGVyfHByZC1pbWFnZXN8NDg4MTh8aW1hZ2UvanBlZ3xhRFZrTDJnek1DODVOVFkwTURRd05EazFNVE0wfDkwZjA3NDA4ODkxMmM3ZDIzMjgzMWM2NzY0MmVkM2I0YmQwMzBjNGJiYTk5ZDJjMTQyNjAwMmY0NmZlZTdmNWM"
+      ],
+      "price": "£24.99",
+      "stock_status": "In stock",
+      "weight": "Dr. Eve_Ryouth Vitamin C Serum + Peptide serum",
+      "description": "Unique blend of Peptides that helps strengthen and improve skin integrity. Collagen increases elasticity and bounce to the skin. The skin will look brighter and more even over time.",
+      "category": "SKIN > SKINCARE GIFT SETS",
+      "discount": "10% off Student Discount",
+      "product_url": "https://www.superdrug.com/skin/skincare-gift-sets/dr-eve-ryouth-vitamin-c-serum-peptide-serum/p/mp-00009784"
+    },
+    {
+      "uuid": "superdrug_cd7b415cd8184d543928c62762a8a936715b538a",
+      "vendor": "superdrug",
+      "source_url": "https://www.superdrug.com/accessories-and-lifestyle/socks/sols-kids-football-/-soccer-socks-s/m/p/mp-00052161",
+      "extracted_at": "2025-08-20T23:14:02.594Z",
+      "product_id": "mp-00052161",
+      "name": "SOLS Kids Football / Soccer Socks (S/M)",
+      "main_image": "https://media.superdrug.com//medias/prd-front-mp-00052161-600x600?context=bWFzdGVyfHByZC1pbWFnZXN8OTk1OXxpbWFnZS9qcGVnfGFEWTFMMmcyTXk4eE1EYzRPREk1TkRRMU9UUXlNaTl3Y21RdFpuSnZiblF0YlhBdE1EQXdOVEl4TmpGZk5qQXdlRFl3TUF8OWU2ODQ2NTYyMDlhZTgxN2JmZmFkZjk1OTNkZTYwZGYxMTYzODNiNTM0ODY0YWEyODViZjkxNTRiNzg2ZmNjMw",
+      "images": [
+        "https://media.superdrug.com/medias/?context=bWFzdGVyfHByZC1pbWFnZXN8MTM3Njh8aW1hZ2UvanBlZ3xhR0ppTDJnNU9DOHhNRGM0TnpBM016ZzFNVFF5TWd8YWNkMWQ1M2E5ODFmZjVhYjUxYWYwYzUxYTBlYzlkZWE0OGE1MTNlYmFlNDg4NDdjYzZhNDk3NDUyZTdjNTNmMw"
+      ],
+      "price": "£7.84",
+      "stock_status": "Out of stock",
+      "weight": "SOLS Kids Football / Soccer Socks (S/M)",
+      "description": "Knee length with ribbed opening. Branding to top of foot. Material: 80% polyester 15% cotton 5% spandex. Children shoe size 11.5-2.5, 3.5-6.",
+      "category": "ACCESSORIES AND LIFESTYLE > SOCKS",
+      "discount": "10% off Student Discount",
+      "product_url": "https://www.superdrug.com/accessories-and-lifestyle/socks/sols-kids-football-/-soccer-socks-s/m/p/mp-00052161"
+    },
+    {
+      "uuid": "superdrug_cfb73a2eb58c4dd36dbc55b5f47785892b0102dc",
+      "vendor": "superdrug",
+      "source_url": "https://www.superdrug.com/hair/shampoo/everyday-shampoo/american-crew-daily-deep-moisturizing-shampoo/p/mp-00022659",
+      "extracted_at": "2025-08-20T23:14:29.117Z",
+      "product_url": "https://www.superdrug.com/hair/shampoo/everyday-shampoo/american-crew-daily-deep-moisturizing-shampoo/p/mp-00022659",
+      "name": "American Crew Daily Deep Moisturizing Shampoo",
+      "price": "£18.73",
+      "weight": "American Crew Daily Deep Moisturizing Shampoo",
+      "description": "American Crew Daily Deep Moisturizing Shampoo 450ml -\n\nNeed rehydration and nourishment for your hair and scalp? This is the shampoo for you. Rich in conditioning emollients, the formula is hydrating and cleansing with the beautiful scent of the signature citrus mint fragrance which energises and invigorates. Infused with vitamin B5, silicone-free and vegan shampoo is carefully curated to ensure hair feels and looks healthier. This Shampoo can be used daily on normal to dry hair.",
+      "category": "EVERYDAY SHAMPOO",
+      "discount": "10% off Student Discount",
+      "main_image": "https://media.superdrug.com//medias/prd-front-mp-00022659-600x600?context=bWFzdGVyfHByZC1pbWFnZXN8MjIwNjZ8aW1hZ2UvanBlZ3xhR1F6TDJoa1pTOHhNREE0TVRnNE1qTTBNVFF3Tmk5d2NtUXRabkp2Ym5RdGJYQXRNREF3TWpJMk5UbGZOakF3ZURZd01BfDQ0NTVkYjVjZGVjNTc1ZDE2ZTkyMjAxZmU0NWQ1ZDExZGQ3NWM1MmIxNzdjMThhNGFiZmFlODc5MmRmYjUxZjc",
+      "stock_status": "In stock",
+      "images": [
+        "https://media.superdrug.com//medias/prd-front-mp-00022659-600x600?context=bWFzdGVyfHByZC1pbWFnZXN8MjIwNjZ8aW1hZ2UvanBlZ3xhR1F6TDJoa1pTOHhNREE0TVRnNE1qTTBNVFF3Tmk5d2NtUXRabkp2Ym5RdGJYQXRNREF3TWpJMk5UbGZOakF3ZURZd01BfDQ0NTVkYjVjZGVjNTc1ZDE2ZTkyMjAxZmU0NWQ1ZDExZGQ3NWM1MmIxNzdjMThhNGFiZmFlODc5MmRmYjUxZjc"
+      ]
+    },
+    {
+      "uuid": "superdrug_6200813bd853a852afd7aaba0bfbcf1a1d5198db",
+      "vendor": "superdrug",
+      "source_url": "https://www.superdrug.com/toiletries/dental/manual-toothbrush/wild-stone-adult-bamboo-toothbrush-4-pack-firm/p/mp-00013562",
+      "extracted_at": "2025-08-20T23:14:41.943Z",
+      "product_url": "https://www.superdrug.com/toiletries/dental/manual-toothbrush/wild-stone-adult-bamboo-toothbrush-4-pack-firm/p/mp-00013562",
+      "name": "Wild & Stone | Adult Bamboo Toothbrush - 4 Pack - Firm",
+      "price": "£7.99",
+      "weight": "Wild & Stone | Adult Bamboo Toothbrush - 4 Pack - Firm",
+      "description": "Our adult bamboo toothbrushes are ideal for use at home, as well as when travelling - all of our bamboo toothbrushes are individually patterned so they do not get mixed up. The package includes four firm bristled biodegradable bamboo toothbrushes in a recyclable, plastic free box.",
+      "category": "MANUAL TOOTHBRUSH",
+      "discount": "10% off Student Discount",
+      "main_image": "https://media.superdrug.com//medias/prd-front-mp-00013562-600x600?context=bWFzdGVyfHByZC1pbWFnZXN8MTgyNjZ8aW1hZ2UvanBlZ3xhRFk0TDJoak15ODVOamcwTmpZMk16ZzBOREUwTDNCeVpDMW1jbTl1ZEMxdGNDMHdNREF4TXpVMk1sODJNREI0TmpBd3xhNTc4OTU3YjVmYzU5M2JkYWZiMGU3NmRhZTk5MjZkNzMwNWI4MDQ3OWFhZTI4NDUzZmZhZDM3YWM4M2YzYmQw",
+      "stock_status": "In stock",
+      "images": [
+        "https://media.superdrug.com//medias/prd-front-mp-00013562-600x600?context=bWFzdGVyfHByZC1pbWFnZXN8MTgyNjZ8aW1hZ2UvanBlZ3xhRFk0TDJoak15ODVOamcwTmpZMk16ZzBOREUwTDNCeVpDMW1jbTl1ZEMxdGNDMHdNREF4TXpVMk1sODJNREI0TmpBd3xhNTc4OTU3YjVmYzU5M2JkYWZiMGU3NmRhZTk5MjZkNzMwNWI4MDQ3OWFhZTI4NDUzZmZhZDM3YWM4M2YzYmQw",
+        "https://media.superdrug.com//medias/prd-back-mp-00013562-600x600?context=bWFzdGVyfHByZC1pbWFnZXN8MjE2NjJ8aW1hZ2UvanBlZ3xhRFV3TDJoa05TODVOamcwTmpZMU5EQXhNemMwTDNCeVpDMWlZV05yTFcxd0xUQXdNREV6TlRZeVh6WXdNSGcyTURBfDg1NjYwOGUzZTI3MGVhMzI0OTIxYjk2OTY3Y2IzZTYzMzdiNzE4MjAyYTI4Yzk1M2Q2MGZjMDk3MDIwNTZiMGQ",
+        "https://media.superdrug.com//medias/prd-side-mp-00013562-600x600?context=bWFzdGVyfHByZC1pbWFnZXN8Mjc0NzV8aW1hZ2UvanBlZ3xhREk0TDJoak55ODVOamcwTmpZMk1qVXpNelF5TDNCeVpDMXphV1JsTFcxd0xUQXdNREV6TlRZeVh6WXdNSGcyTURBfGU0M2VlYmM2MjNhMTBiODMzMzE3ZjYyNzVlYzcxODdlMjQzMjhhMzQ0ZjM0YWY1NjM2YzRjZGNmYjcwNmYyMGI"
+      ]
+    },
+    {
+      "uuid": "superdrug_31211921a0697037cad239f4f6d5fb49a1a4ae87",
+      "vendor": "superdrug",
+      "source_url": "https://www.superdrug.com/accessories-and-lifestyle/stationery/amscan-fairy-princess-invitations-pack-of-6/p/mp-00050636",
+      "extracted_at": "2025-08-20T23:14:52.178Z",
+      "product_id": "mp-00050636",
+      "name": "Amscan Fairy Princess Invitations (Pack of 6)",
+      "main_image": "https://media.superdrug.com//medias/prd-front-mp-00050636-600x600?context=bWFzdGVyfHByZC1pbWFnZXN8MjYwNDh8aW1hZ2UvanBlZ3xhRFF3TDJnNE5pOHhNVFk1TmpVNE9UTXdOemt6TkM5d2NtUXRabkp2Ym5RdGJYQXRNREF3TlRBMk16WmZOakF3ZURZd01BfDBjNjIwMWJlY2Q5ZmUxODZhMjdmMTZhOTFlYWIwYzI0NWEzMjEzY2FkYmI1NjY0NDAzZTNhMzQzNTQxZTAxMTM",
+      "images": [
+        "https://media.superdrug.com/medias/?context=bWFzdGVyfHByZC1pbWFnZXN8MjYxNTB8aW1hZ2UvanBlZ3xhREJqTDJnNFppOHhNVFk1TXprMk1USXhOakF6TUF8YTcyYzY4NDVkMzc5MzA5YTg1OWJkNDcyZGY0YjdlMWY4YmE2YzdiY2YyOTBiOTEzYjY3Mjk0YTc1YzA3NTQxZg"
+      ],
+      "price": "£7.05",
+      "stock_status": "In stock",
+      "weight": "Amscan Fairy Princess Invitations (Pack of 6)",
+      "description": "Design: Glitter, Party Hat. Contents: 6 Envelope.",
+      "category": "STATIONERY",
+      "discount": "10% off Student Discount",
+      "product_url": "https://www.superdrug.com/accessories-and-lifestyle/stationery/amscan-fairy-princess-invitations-pack-of-6/p/mp-00050636"
+    },
+    {
+      "uuid": "superdrug_0ddca0a48b7dcacd88e37770742f0482ddc8112e",
+      "vendor": "superdrug",
+      "source_url": "https://www.superdrug.com/fragrance/perfume-for-women/womens-perfume/benetton-united-dreams-love-yourself-edt-50ml/p/mp-00043623",
+      "extracted_at": "2025-08-20T23:15:26.503Z",
+      "product_url": "https://www.superdrug.com/fragrance/perfume-for-women/womens-perfume/benetton-united-dreams-love-yourself-edt-50ml/p/mp-00043623",
+      "name": "Benetton United Dreams Love Yourself EDT 50ml",
+      "price": "£10.99",
+      "weight": "Benetton United Dreams Love Yourself EDT 50ml",
+      "description": "Benetton United Dreams Love Yourself Eau de Toilette 50ml Spray is a premium eau de toilette of Benetton brand.",
+      "category": "WOMEN’S PERFUME",
+      "discount": "10% off Student Discount",
+      "main_image": "https://media.superdrug.com//medias/prd-front-mp-00043623-600x600?context=bWFzdGVyfHByZC1pbWFnZXN8NDQwODd8aW1hZ2UvanBlZ3xhR1ExTDJnelpDOHhNRGN4T0RRNE56WTNORGt4TUM5d2NtUXRabkp2Ym5RdGJYQXRNREF3TkRNMk1qTmZOakF3ZURZd01BfDNmZDNkNWE2Y2JlODE1NDBlNDYyOTkxZmE2OTkzZDQyNTUwNWVkYTg5ODIxNWUyZjA3MjI5YTdhNWZmYmIyOWI",
+      "stock_status": "In stock",
+      "images": [
+        "https://media.superdrug.com//medias/prd-front-mp-00043623-600x600?context=bWFzdGVyfHByZC1pbWFnZXN8NDQwODd8aW1hZ2UvanBlZ3xhR1ExTDJnelpDOHhNRGN4T0RRNE56WTNORGt4TUM5d2NtUXRabkp2Ym5RdGJYQXRNREF3TkRNMk1qTmZOakF3ZURZd01BfDNmZDNkNWE2Y2JlODE1NDBlNDYyOTkxZmE2OTkzZDQyNTUwNWVkYTg5ODIxNWUyZjA3MjI5YTdhNWZmYmIyOWI"
+      ]
+    },
+    {
+      "uuid": "superdrug_dea44b72e693e5dfea208e036783bfe497512445",
+      "vendor": "superdrug",
+      "source_url": "https://www.superdrug.com/skin/body-care/body-creams/dr-botanicals-blueberry-body-moisturiser-60ml/p/mp-00012667",
+      "extracted_at": "2025-08-20T23:15:35.604Z",
+      "product_url": "https://www.superdrug.com/skin/body-care/body-creams/dr-botanicals-blueberry-body-moisturiser-60ml/p/mp-00012667",
+      "name": "Dr Botanicals Blueberry Body Moisturiser 60ml",
+      "price": "£9.90",
+      "weight": "Dr Botanicals Blueberry Body Moisturiser 60ml",
+      "description": "Is renowned for brightening skin and truly nourishing for a silky and supple finish.",
+      "category": "BODY CREAMS",
+      "discount": "10% off Student Discount",
+      "main_image": "https://media.superdrug.com//medias/prd-front-mp-00012667-600x600?context=bWFzdGVyfHByZC1pbWFnZXN8MjQ2NTV8aW1hZ2UvanBlZ3xhREUzTDJnNVl5ODVOall6TnpnNE16ZzBNamcyTDNCeVpDMW1jbTl1ZEMxdGNDMHdNREF4TWpZMk4xODJNREI0TmpBd3wzM2FjYWFjM2JiMDA1MTdkZjBmNWJkODBkNTQxMzM2MDlhZjQ0NjMzYjQzMjdhNGVlMzRiNDYzZTQwOGI1Mzhm",
+      "stock_status": "Out of stock",
+      "images": [
+        "https://media.superdrug.com//medias/prd-front-mp-00012667-600x600?context=bWFzdGVyfHByZC1pbWFnZXN8MjQ2NTV8aW1hZ2UvanBlZ3xhREUzTDJnNVl5ODVOall6TnpnNE16ZzBNamcyTDNCeVpDMW1jbTl1ZEMxdGNDMHdNREF4TWpZMk4xODJNREI0TmpBd3wzM2FjYWFjM2JiMDA1MTdkZjBmNWJkODBkNTQxMzM2MDlhZjQ0NjMzYjQzMjdhNGVlMzRiNDYzZTQwOGI1Mzhm"
+      ]
+    },
+    {
+      "uuid": "superdrug_6a887e28ade64a32de7a936a78784fdf2dfa08db",
+      "vendor": "superdrug",
+      "source_url": "https://www.superdrug.com/fragrance/perfume-for-women/womens-perfume/carven-paris-izmir-eau-de-parfum-100ml/p/mp-00032121",
+      "extracted_at": "2025-08-20T23:15:40.037Z",
+      "product_url": "https://www.superdrug.com/fragrance/perfume-for-women/womens-perfume/carven-paris-izmir-eau-de-parfum-100ml/p/mp-00032121",
+      "name": "Carven Paris Izmir Eau de Parfum 100ml",
+      "price": "£89.95",
+      "weight": "Carven Paris Izmir Eau de Parfum 100ml",
+      "description": "Paris Izmir by Carven is a warm spicy amber fragrance for women.",
+      "category": "WOMEN’S PERFUME",
+      "discount": "10% off Student Discount",
+      "main_image": "https://media.superdrug.com//medias/prd-front-mp-00032121-600x600?context=bWFzdGVyfHByZC1pbWFnZXN8NTY1ODF8aW1hZ2UvanBlZ3xhRFEyTDJneE1DOHhNRE0yT0RnNE5qZzJOVGsxTUM5d2NtUXRabkp2Ym5RdGJYQXRNREF3TXpJeE1qRmZOakF3ZURZd01BfDJlMzAzMDY5NmFlZWE5MjdhZDcwNDQ1NmU2YjUxNjNmNjEwNzNkZDU2YjQ5YjUzNmI0MTcxMWE1NjRjMmUxNGY",
+      "stock_status": "Out of stock",
+      "images": [
+        "https://media.superdrug.com//medias/prd-front-mp-00032121-600x600?context=bWFzdGVyfHByZC1pbWFnZXN8NTY1ODF8aW1hZ2UvanBlZ3xhRFEyTDJneE1DOHhNRE0yT0RnNE5qZzJOVGsxTUM5d2NtUXRabkp2Ym5RdGJYQXRNREF3TXpJeE1qRmZOakF3ZURZd01BfDJlMzAzMDY5NmFlZWE5MjdhZDcwNDQ1NmU2YjUxNjNmNjEwNzNkZDU2YjQ5YjUzNmI0MTcxMWE1NjRjMmUxNGY"
+      ]
+    },
+    {
+      "uuid": "superdrug_be06c15cc651b7a6fb67852b08aabb84d0606289",
+      "vendor": "superdrug",
+      "source_url": "https://www.superdrug.com/mens/shaving/shaving-balms-creams/seven-potions-shaving-cream-120ml/p/mp-00007239",
+      "extracted_at": "2025-08-20T23:13:28.221Z",
+      "product_url": "https://www.superdrug.com/mens/shaving/shaving-balms-creams/seven-potions-shaving-cream-120ml/p/mp-00007239",
+      "name": "Seven Potions Shaving Cream 120ml",
+      "price": "£11.99",
+      "weight": "Seven Potions Shaving Cream 120ml",
+      "description": "Close, comfortable shave with the help of Seven Potions Natural Shaving Cream. Rich lather, extra slickness and less skin irritation.",
+      "category": "SHAVING BALMS & CREAMS",
+      "discount": "10% off Student Discount",
+      "main_image": "https://media.superdrug.com//medias/prd-front-mp-00007239-600x600?context=bWFzdGVyfHByZC1pbWFnZXN8OTc5ODl8aW1hZ2UvanBlZ3xhR013TDJnNFlTODVOVEl3TnpnNU1ESTRPRGswTDNCeVpDMW1jbTl1ZEMxdGNDMHdNREF3TnpJek9WODJNREI0TmpBd3w3ZWU3ZWNlZTI0MDY4ZTA5MzA0ZjExNjhlNjhhMWNjZGIxYTBmZmI1NTI1OWY3ZTE4YTA0YWEzNmQwNDVkOWVh",
+      "stock_status": "In stock",
+      "images": [
+        "https://media.superdrug.com//medias/prd-front-mp-00007239-600x600?context=bWFzdGVyfHByZC1pbWFnZXN8OTc5ODl8aW1hZ2UvanBlZ3xhR013TDJnNFlTODVOVEl3TnpnNU1ESTRPRGswTDNCeVpDMW1jbTl1ZEMxdGNDMHdNREF3TnpJek9WODJNREI0TmpBd3w3ZWU3ZWNlZTI0MDY4ZTA5MzA0ZjExNjhlNjhhMWNjZGIxYTBmZmI1NTI1OWY3ZTE4YTA0YWEzNmQwNDVkOWVh"
+      ]
+    },
+    {
+      "uuid": "superdrug_b1c86510434e1f65e6ee51790cd1a9d7fbcc4fe4",
+      "vendor": "superdrug",
+      "source_url": "https://www.superdrug.com/hair/hair-brushes/lifemax-massage-hair-brush-promotes-growth-and-circulation/p/mp-00021429",
+      "extracted_at": "2025-08-20T23:13:34.539Z",
+      "product_id": "mp-00021429",
+      "name": "Lifemax Massage Hair Brush, Promotes Growth and Circulation",
+      "main_image": "https://media.superdrug.com//medias/prd-front-mp-00021429-600x600?context=bWFzdGVyfHByZC1pbWFnZXN8MTc0MzR8aW1hZ2UvanBlZ3xhREpoTDJnME9TOHhNREEyTURNeU56SXlNek15Tmk5d2NtUXRabkp2Ym5RdGJYQXRNREF3TWpFME1qbGZOakF3ZURZd01BfDJiNTQ3ODI3ZmRiZGM2NThlOGI5YWE3MTA1MGNiMGFiMjdkNjljYWYwZTk2OGU3NGQwNmZkZTdlZmMzYmY3YmE",
+      "images": [
+        "https://media.superdrug.com/medias/?context=bWFzdGVyfHByZC1pbWFnZXN8Mzk0NTJ8aW1hZ2UvanBlZ3xhRGxqTDJnMllpOHhNREEyTURJME5EYzNPVEF6T0F8NjY3MThlNzZkYzU1MzJhMTllN2QyMzU1ZWQyNGQ3NzUyMDc2YjEwN2FlNmU1OGYyNTRlZGNiY2U3ODVjMzZlYQ"
+      ],
+      "price": "£20.99",
+      "stock_status": "In stock",
+      "weight": "Lifemax Massage Hair Brush, Promotes Growth and Circulation",
+      "description": "Enjoy the relaxing effect of a gentle head massage by simply brushing",
+      "category": "HAIR BRUSHES",
+      "discount": "10% off Student Discount",
+      "product_url": "https://www.superdrug.com/hair/hair-brushes/lifemax-massage-hair-brush-promotes-growth-and-circulation/p/mp-00021429"
+    },
+    {
+      "uuid": "superdrug_3d31a468ae9929e390450f21e766d60eace53eb1",
+      "vendor": "superdrug",
+      "source_url": "https://www.superdrug.com/accessories-and-lifestyle/stationery/stranger-things-3d-vecna-a5-notebook-21cm-x-14cm/p/mp-00049826",
+      "extracted_at": "2025-08-20T23:14:00.846Z",
+      "product_id": "mp-00049826",
+      "name": "Stranger Things 3D Vecna A5 Notebook (21cm x 14cm)",
+      "main_image": "https://media.superdrug.com//medias/prd-front-mp-00049826-600x600?context=bWFzdGVyfHByZC1pbWFnZXN8NDU0OTR8aW1hZ2UvanBlZ3xhR1l3TDJnNFl5OHhNVFk1TlRrNE1EZzNNVGN4TUM5d2NtUXRabkp2Ym5RdGJYQXRNREF3TkRrNE1qWmZOakF3ZURZd01BfGI1MjgyODgyN2ExNTgxNmYyMzdjNDNmNWRmY2U2OTJkN2QwMjcwZTdiZTYyYjAzMTVmYTA5OGFhZmNmOTUzYWM",
+      "images": [
+        "https://media.superdrug.com/medias/?context=bWFzdGVyfHByZC1pbWFnZXN8NDU1MTN8aW1hZ2UvanBlZ3xhREppTDJnMFpTOHhNVFk1TXpjek1EUTJNemMzTkF8OGY5YjM5NTI3OTdkYjcxOGZhNWZlOGViNGFlNzkxYjYzMjNkM2M3MDljNTM2Y2I3NDYxYzVhM2Q0NWVjYTFlNQ"
+      ],
+      "price": "£9.75",
+      "stock_status": "In stock",
+      "weight": "Stranger Things 3D Vecna A5 Notebook (21cm x 14cm)",
+      "description": "Corner Logo, Hardback, Lined Pages, Spiral Bound. Design: 3D Effect, Characters, Logo. Characters: Dustin Henderson, Eleven, Max, Mike Wheeler, Steve Harrington, Vecna, Will. 100% Officially Licensed.",
+      "category": "ACCESSORIES AND LIFESTYLE",
+      "discount": "10% off Student Discount",
+      "product_url": "https://www.superdrug.com/accessories-and-lifestyle/stationery/stranger-things-3d-vecna-a5-notebook-21cm-x-14cm/p/mp-00049826"
+    },
+    {
+      "uuid": "superdrug_1d0ee1c4ce94f15d8f69440789f8c1236c533ac5",
+      "vendor": "superdrug",
+      "source_url": "https://www.superdrug.com/fragrance/perfume-for-women/womens-perfume/oscar-de-la-renta-oscar-so-de-la-renta-edt-perfume-100ml/p/mp-00020600",
+      "extracted_at": "2025-08-20T23:14:28.043Z",
+      "product_url": "https://www.superdrug.com/fragrance/perfume-for-women/womens-perfume/oscar-de-la-renta-oscar-so-de-la-renta-edt-perfume-100ml/p/mp-00020600",
+      "name": "Oscar De La Renta Oscar So De La Renta EDT Perfume 100ml",
+      "price": "£22.99",
+      "weight": "Oscar De La Renta Oscar So De La Renta EDT Perfume 100ml",
+      "description": "So de la Renta by Oscar de la Renta is a Floral Fruity fragrance for women. This fresh and feminine scent has the divine energy of a woman.",
+      "category": "WOMEN’S PERFUME",
+      "discount": "10% off Student Discount",
+      "main_image": "https://media.superdrug.com//medias/prd-front-mp-00020600-600x600?context=bWFzdGVyfHByZC1pbWFnZXN8MjAyMzd8aW1hZ2UvanBlZ3xhRE15TDJoaE9TOHhNREF6TWpFeE5USTROakEwTmk5d2NtUXRabkp2Ym5RdGJYQXRNREF3TWpBMk1EQmZOakF3ZURZd01BfDI5ZWJlNjAyYjYwMDU3NWVkZmU2YjhkZjJhM2M3YTNlNTAzNTlhOWVlODQxZDY1YWUxODMwYzI0ZDFjMDcxZDg",
+      "stock_status": "Out of stock",
+      "images": [
+        "https://media.superdrug.com//medias/prd-front-mp-00020600-600x600?context=bWFzdGVyfHByZC1pbWFnZXN8MjAyMzd8aW1hZ2UvanBlZ3xhRE15TDJoaE9TOHhNREF6TWpFeE5USTROakEwTmk5d2NtUXRabkp2Ym5RdGJYQXRNREF3TWpBMk1EQmZOakF3ZURZd01BfDI5ZWJlNjAyYjYwMDU3NWVkZmU2YjhkZjJhM2M3YTNlNTAzNTlhOWVlODQxZDY1YWUxODMwYzI0ZDFjMDcxZDg"
+      ]
+    },
+    {
+      "uuid": "superdrug_e7c439b822f48b06aed3d796465044df2b5064f3",
+      "vendor": "superdrug",
+      "source_url": "https://www.superdrug.com/accessories-and-lifestyle/home-fragrance/reed-diffusers/amphora-aromatics-reed-diffuser-kit-nutmeg/p/mp-00004048",
+      "extracted_at": "2025-08-20T23:14:33.528Z",
+      "product_url": "https://www.superdrug.com/accessories-and-lifestyle/home-fragrance/reed-diffusers/amphora-aromatics-reed-diffuser-kit-nutmeg/p/mp-00004048",
+      "name": "Amphora Aromatics Reed Diffuser Kit - Nutmeg.",
+      "price": "£15.00",
+      "weight": "Amphora Aromatics Reed Diffuser Kit - Nutmeg.",
+      "description": "Warming & Soothing. A sweet, conformting aroma. Everything you need in one handy kit",
+      "category": "REED DIFFUSERS",
+      "discount": "10% off Student Discount",
+      "main_image": "https://media.superdrug.com//medias/prd-front-mp-00004048-600x600?context=bWFzdGVyfHByZC1pbWFnZXN8NDMwMTl8aW1hZ2UvanBlZ3xhRGN3TDJnNE1TODVORGM0TURRM09Ea3hORGcyTDNCeVpDMW1jbTl1ZEMxdGNDMHdNREF3TkRBME9GODJNREI0TmpBd3wxNWMyM2ZjNzVlY2RkNjUzZWNlZWIzYWVhNzRkNjQ0ZGJhYzY0NWM2OTE3YzY1NmE3ZmY2ZjdhZWUwYmIwNzgw",
+      "stock_status": "Out of stock",
+      "images": [
+        "https://media.superdrug.com//medias/prd-front-mp-00004048-600x600?context=bWFzdGVyfHByZC1pbWFnZXN8NDMwMTl8aW1hZ2UvanBlZ3xhRGN3TDJnNE1TODVORGM0TURRM09Ea3hORGcyTDNCeVpDMW1jbTl1ZEMxdGNDMHdNREF3TkRBME9GODJNREI0TmpBd3wxNWMyM2ZjNzVlY2RkNjUzZWNlZWIzYWVhNzRkNjQ0ZGJhYzY0NWM2OTE3YzY1NmE3ZmY2ZjdhZWUwYmIwNzgw"
+      ]
+    },
+    {
+      "uuid": "superdrug_a9994fdad3f07cbaeafe51f7dfa4489482077a77",
+      "vendor": "superdrug",
+      "source_url": "https://www.superdrug.com/accessories-and-lifestyle/stationery/westford-mill-shimmer-bottle-bag/p/mp-00052269",
+      "extracted_at": "2025-08-20T23:14:42.281Z",
+      "product_id": "mp-00052269",
+      "name": "Westford Mill Shimmer Bottle Bag",
+      "main_image": "https://media.superdrug.com//medias/prd-front-mp-00052269-600x600?context=bWFzdGVyfHByZC1pbWFnZXN8MjY5MjR8aW1hZ2UvanBlZ3xhRFU1TDJobE1DOHhNakEyTmpJd016azFPVE15Tmk5d2NtUXRabkp2Ym5RdGJYQXRNREF3TlRJeU5qbGZOakF3ZURZd01BfGNkMGMzMGUzNjRmMjhhYzY4OWY2MGVjNTQ1YjA1OTYzZmNhMjM5ZjU4YmFjMWY1NmQxNjc4MDc5NGQ0MzU5N2E",
+      "images": [
+        "https://media.superdrug.com/medias/?context=bWFzdGVyfHByZC1pbWFnZXN8MjY5MTZ8aW1hZ2UvanBlZ3xhRFF3TDJneE1DOHhNakEyTmpFNU1ESTJNak13TWd8ZjcwYzg1MjgyZjVlODM3NTY1Y2YwNTI2MmVkZTNiNDZhNGUzNjlhNzcxNjUzMzFjNTM5ZTYzMDliMDM3NDhmNw"
+      ],
+      "price": "£4.78",
+      "stock_status": "In stock",
+      "weight": "Westford Mill Shimmer Bottle Bag",
+      "description": "98% Laminated Jute, 2% Metallic Fibre. Height: 35cm. Length: 12cm. Width: 11cm. Design: Shimmer. Handle Features: 2 Handles. Sustainability: REACH, SAI Certified. Capacity: 1.5L. Cotton Handle.",
+      "category": "ACCESSORIES AND LIFESTYLE",
+      "discount": "10% off Student Discount",
+      "product_url": "https://www.superdrug.com/accessories-and-lifestyle/stationery/westford-mill-shimmer-bottle-bag/p/mp-00052269"
+    },
+    {
+      "uuid": "superdrug_94c912757db5d6aac12e3be3664985b5ff7354be",
+      "vendor": "superdrug",
+      "source_url": "https://www.superdrug.com/accessories-and-lifestyle/stationery/oaktree-treat-box-pack-of-6/p/mp-00054317",
+      "extracted_at": "2025-08-20T23:15:05.847Z",
+      "product_id": "mp-00054317",
+      "name": "Oaktree Treat Box (Pack of 6)",
+      "main_image": "https://media.superdrug.com//medias/prd-front-mp-00054317-600x600?context=bWFzdGVyfHByZC1pbWFnZXN8MTYyODV8aW1hZ2UvanBlZ3xhRFptTDJoa05pOHhNVGd3TkRZeE5UVTBNRGMyTmk5d2NtUXRabkp2Ym5RdGJYQXRNREF3TlRRek1UZGZOakF3ZURZd01BfGMyOGQ5OGIyYTFjODk0MDgyMzk0OWI0Yzc4NjMzMmU2NjQxNDIwMzcxZjJmYmJkMTA1YzUyZWRmY2VjY2U5MTg",
+      "images": [
+        "https://media.superdrug.com/medias/?context=bWFzdGVyfHByZC1pbWFnZXN8MTYyNTV8aW1hZ2UvanBlZ3xhRGxoTDJoaFpDOHhNVGd3TkRVNU56VXhPRE0yTmd8OTQ3ZTM3MmU0NmFkMDRhNjI1OWMzOTg0Njc3OTZiOWNkMTUwNzczZTNmZDQ3Y2I0MTIyMDVlYmQyZmNkYjJlMg"
+      ],
+      "price": "£4.78",
+      "stock_status": "In stock",
+      "weight": "Oaktree Treat Box (Pack of 6)",
+      "description": "Width: 154mm. Length: 100mm. Height: 92mm. Design: Gloss, Plain. Compartments: 1 Main Compartment. Carry Handle, Pops Open, Side Tabs.",
+      "category": "ACCESSORIES AND LIFESTYLE",
+      "discount": "10% off Student Discount",
+      "product_url": "https://www.superdrug.com/accessories-and-lifestyle/stationery/oaktree-treat-box-pack-of-6/p/mp-00054317"
+    },
+    {
+      "uuid": "superdrug_c0daa7b7ce2336bd8dfae83174b0713c5c754e43",
+      "vendor": "superdrug",
+      "source_url": "https://www.superdrug.com/make-up/make-up-accessories/tweezers/laroc-false-eyelash-applicator-tweezers/p/mp-00021886",
+      "extracted_at": "2025-08-20T23:47:38.624Z",
+      "product_url": "https://www.superdrug.com/make-up/make-up-accessories/tweezers/laroc-false-eyelash-applicator-tweezers/p/mp-00021886",
+      "name": "LaRoc False Eyelash Applicator Tweezers",
+      "price": "£6.99",
+      "weight": "LaRoc False Eyelash Applicator Tweezers",
+      "description": "LaRoc false eyelash application tweezers. Perfect tool for precise application of lashes. Can also be used for removing lashes. Made from a robust stainless steel. Size: 11cm x 2cm.",
+      "category": "TWEEZERS",
+      "discount": "10% off Student Discount",
+      "main_image": "https://media.superdrug.com//medias/prd-front-mp-00021886-600x600?context=bWFzdGVyfHByZC1pbWFnZXN8Mzk1MzR8aW1hZ2UvanBlZ3xhRFJsTDJnNE1pOHhNREEyTmprM05ERXhNemd5TWk5d2NtUXRabkp2Ym5RdGJYQXRNREF3TWpFNE9EWmZOakF3ZURZd01BfDVjZDU4MmM0ZGMwYTJlNGQzMDE5YzM2ZTM5ZWQ5YzU0NjMwOGM2ZThhYTEwNTY0ODBkNjExNzg0YzY5ZTY3ZWM",
+      "stock_status": "In stock",
+      "images": [
+        "https://media.superdrug.com//medias/prd-front-mp-00021886-600x600?context=bWFzdGVyfHByZC1pbWFnZXN8Mzk1MzR8aW1hZ2UvanBlZ3xhRFJsTDJnNE1pOHhNREEyTmprM05ERXhNemd5TWk5d2NtUXRabkp2Ym5RdGJYQXRNREF3TWpFNE9EWmZOakF3ZURZd01BfDVjZDU4MmM0ZGMwYTJlNGQzMDE5YzM2ZTM5ZWQ5YzU0NjMwOGM2ZThhYTEwNTY0ODBkNjExNzg0YzY5ZTY3ZWM"
+      ]
+    },
+    {
+      "uuid": "superdrug_3a0eedd00d38a879449d40cad02d1c6e874b11be",
+      "vendor": "superdrug",
+      "source_url": "https://www.superdrug.com/make-up/eye-makeup/eyeliner/glisten-cosmetics-sunflower-eyeliner-3g/p/mp-00019121",
+      "extracted_at": "2025-08-20T23:47:53.245Z",
+      "product_url": "https://www.superdrug.com/make-up/eye-makeup/eyeliner/glisten-cosmetics-sunflower-eyeliner-3g/p/mp-00019121",
+      "name": "Glisten Cosmetics - Sunflower - Eyeliner 3g",
+      "price": "£6.50",
+      "weight": "Glisten Cosmetics - Sunflower - Eyeliner 3g",
+      "description": "Colourful, water-activated eyeliners. Just add a few drops of water & you'll be ready to wow. Our huge collection of Wet Liners comes in over 150 colours & can be mixed together to create new colours.",
+      "category": "EYELINER",
+      "discount": "10% off Student Discount",
+      "main_image": "https://media.superdrug.com//medias/prd-front-mp-00019121-600x600?context=bWFzdGVyfHByZC1pbWFnZXN8MzAzNTN8aW1hZ2UvanBlZ3xhRFl6TDJoaVpDODVPVFl6TURVNU9UY3dNRGM0TDNCeVpDMW1jbTl1ZEMxdGNDMHdNREF4T1RFeU1WODJNREI0TmpBd3wwZDNhZDhhN2YwNWZjN2M4MjVlMDI2NzE0Zjc2ZmIzN2FkOWQ3N2QyM2ZiODQyZmQyNjhmM2Q2YmY0MjBhZWIx",
+      "stock_status": "In stock",
+      "images": [
+        "https://media.superdrug.com//medias/prd-front-mp-00019121-600x600?context=bWFzdGVyfHByZC1pbWFnZXN8MzAzNTN8aW1hZ2UvanBlZ3xhRFl6TDJoaVpDODVPVFl6TURVNU9UY3dNRGM0TDNCeVpDMW1jbTl1ZEMxdGNDMHdNREF4T1RFeU1WODJNREI0TmpBd3wwZDNhZDhhN2YwNWZjN2M4MjVlMDI2NzE0Zjc2ZmIzN2FkOWQ3N2QyM2ZiODQyZmQyNjhmM2Q2YmY0MjBhZWIx",
+        "https://media.superdrug.com//medias/prd-back-mp-00019121-600x600?context=bWFzdGVyfHByZC1pbWFnZXN8NjE4MTJ8aW1hZ2UvanBlZ3xhRE0wTDJoaE1pODVPVFl6TURVNU1UZ3pOalEyTDNCeVpDMWlZV05yTFcxd0xUQXdNREU1TVRJeFh6WXdNSGcyTURBfDZmM2ZmZmUyMjU4NTE2YjQ1MGFkMDlhZDU3ZGExMjA1MjYwODA2NmQ1ZmY5OWM2OTIyM2E1MzUxZWI0NTgwZGI"
+      ]
+    },
+    {
+      "uuid": "superdrug_c54bf39c715231a1552697dce3d4b0aa5c974c11",
+      "vendor": "superdrug",
+      "source_url": "https://www.superdrug.com/fragrance/fragrance-for-him/mens-aftershave/maurer-wirtz-tabac-original-aftershave-200ml-splash/p/mp-00041709",
+      "extracted_at": "2025-08-20T23:47:40.069Z",
+      "product_url": "https://www.superdrug.com/fragrance/fragrance-for-him/mens-aftershave/maurer-wirtz-tabac-original-aftershave-200ml-splash/p/mp-00041709",
+      "name": "Maurer & Wirtz Tabac Original Aftershave 200ml Splash",
+      "price": "£17.81",
+      "weight": "Maurer & Wirtz Tabac Original Aftershave 200ml Splash",
+      "description": "Maurer & Wirtz Tabac Original Aftershave 200ml Splash is a premium aftershave lotion (splash) of Maurer & Wirtz brand. Maurer & Wirtz was founded in 1854 by Michael Maurer and his stepson, Andreas Wirtz, when they decided to start production of soap in the small town of Stolberg near Aachen, Germany. This company has stayed in the family for five generations so far. This house represents many other famous designer houses which produce perfumes in cooperation with Maurer & Wirtz, such as: Carlo Colucci, TNT, s.Oliver‚Äô, Tosca, Betty Barclay, Otto Kern and other. Maurer & Wirtz fragrances were made in collaboration with perfumers Jacques Huclier and Vincent Schaller.",
+      "category": "MEN'S AFTERSHAVE",
+      "discount": "10% off Student Discount",
+      "main_image": "https://media.superdrug.com//medias/prd-front-mp-00041709-600x600?context=bWFzdGVyfHByZC1pbWFnZXN8MTE0NjN8aW1hZ2UvanBlZ3xhR1V3TDJnMlppOHhNRGN3TXpFek1UazJOelV4T0M5d2NtUXRabkp2Ym5RdGJYQXRNREF3TkRFM01EbGZOakF3ZURZd01BfGU0MTZjNDBiZWI1OWIxNjI5MTRlZDg1ZDYyNmViNGJjZjY5OWQ3ZjY4MWViZTVlMjM2MmRiMzcyZjg4NjFiOWU",
+      "stock_status": "In stock",
+      "images": [
+        "https://media.superdrug.com//medias/prd-front-mp-00041709-600x600?context=bWFzdGVyfHByZC1pbWFnZXN8MTE0NjN8aW1hZ2UvanBlZ3xhR1V3TDJnMlppOHhNRGN3TXpFek1UazJOelV4T0M5d2NtUXRabkp2Ym5RdGJYQXRNREF3TkRFM01EbGZOakF3ZURZd01BfGU0MTZjNDBiZWI1OWIxNjI5MTRlZDg1ZDYyNmViNGJjZjY5OWQ3ZjY4MWViZTVlMjM2MmRiMzcyZjg4NjFiOWU"
+      ]
+    },
+    {
+      "uuid": "superdrug_98289f2046459bd1d6cc7c776c55decd0494e07d",
+      "vendor": "superdrug",
+      "source_url": "https://www.superdrug.com/skin/face-skin-care/face-masks/face-masks-sheets/beautical-peptide-revitalizing-mask/p/mp-00046792",
+      "extracted_at": "2025-08-20T23:47:47.363Z",
+      "product_url": "https://www.superdrug.com/skin/face-skin-care/face-masks/face-masks-sheets/beautical-peptide-revitalizing-mask/p/mp-00046792",
+      "name": "Beautical Peptide Revitalizing Mask",
+      "price": "£9.95",
+      "weight": "Beautical Peptide Revitalizing Mask",
+      "description": "This revitalizing sheet mask provides an exceptional treatment with visible, long-lasting results in just 20 minutes: deep moisturizing, soothing, brightening and firming.",
+      "category": "FACE MASKS",
+      "discount": "10% off Student Discount",
+      "main_image": "https://media.superdrug.com//medias/prd-front-mp-00046792-600x600?context=bWFzdGVyfHByZC1pbWFnZXN8MjMwMzZ8aW1hZ2UvanBlZ3xhREJtTDJoall5OHhNRGMxTkRNMk16UXlORGM1T0M5d2NtUXRabkp2Ym5RdGJYQXRNREF3TkRZM09USmZOakF3ZURZd01BfDI1OWFmZjhlYzQzZWE0NGNkYjAyNWVlZWM2NzFiYTU1N2Y2Mzg0ZmJkZTY3ZTllNjIwYWMzN2QyN2Q0NDJjOWI",
+      "stock_status": "Out of stock",
+      "images": [
+        "https://media.superdrug.com//medias/prd-front-mp-00046792-600x600?context=bWFzdGVyfHByZC1pbWFnZXN8MjMwMzZ8aW1hZ2UvanBlZ3xhREJtTDJoall5OHhNRGMxTkRNMk16UXlORGM1T0M5d2NtUXRabkp2Ym5RdGJYQXRNREF3TkRZM09USmZOakF3ZURZd01BfDI1OWFmZjhlYzQzZWE0NGNkYjAyNWVlZWM2NzFiYTU1N2Y2Mzg0ZmJkZTY3ZTllNjIwYWMzN2QyN2Q0NDJjOWI",
+        "https://media.superdrug.com//medias/prd-back-mp-00046792-600x600?context=bWFzdGVyfHByZC1pbWFnZXN8NDk4NTh8aW1hZ2UvanBlZ3xhRGMyTDJnMk5TOHhNRGMxTkRNMk1qVXdOekk1TkM5d2NtUXRZbUZqYXkxdGNDMHdNREEwTmpjNU1sODJNREI0TmpBd3w0ODE3ZTJiZWQ3ZjFlYzdmMDQ5ZTU1NThkNDY4OWQ5NzU4YjBhNWFhMzIwNDlhYjlkOWMyMjQ0NTczNjU5YjFj"
+      ]
+    },
+    {
+      "uuid": "superdrug_f6ce7d8e0f5759a4db6435576888de20283c308b",
+      "vendor": "superdrug",
+      "source_url": "https://www.superdrug.com/accessories-and-lifestyle/tights/fashion-patterned-tights/hy-kids-dynamizs-ecliptic-horse-riding-tights-7-8-years/p/mp-00049898",
+      "extracted_at": "2025-08-20T23:47:56.742Z",
+      "product_url": "https://www.superdrug.com/accessories-and-lifestyle/tights/fashion-patterned-tights/hy-kids-dynamizs-ecliptic-horse-riding-tights-7-8-years/p/mp-00049898",
+      "name": "Hy Kids DynaMizs Ecliptic Horse Riding Tights (7-8 Years)",
+      "price": "£47.20",
+      "weight": "Hy Kids DynaMizs Ecliptic Horse Riding Tights (7-8 Years)",
+      "description": "80% Nylon, 20% Elastane. Fabric: 4 Way Stretch. Design: Printed. Silicone Knee. Pockets: 1 Mobile Phone Pocket.",
+      "category": "FASHION & PATTERNED TIGHTS",
+      "discount": "10% off Student Discount",
+      "main_image": "https://media.superdrug.com//medias/prd-front-mp-00049898-600x600?context=bWFzdGVyfHByZC1pbWFnZXN8MTk3Nzd8aW1hZ2UvanBlZ3xhR1ZsTDJnelpDOHhNRGM0TnpZeE5UTXdPVGcxTkM5d2NtUXRabkp2Ym5RdGJYQXRNREF3TkRrNE9UaGZOakF3ZURZd01BfGIzOWI1ZWJhY2Y5ZjM5MDY2Y2RhNDIzZTcyMzE2YjU0MDU0Nzg3ZDdiNGY0MmEzOTIzYmJmOTMwMTgxNmE2NDI",
+      "stock_status": "Out of stock",
+      "images": [
+        "https://media.superdrug.com//medias/prd-front-mp-00049898-600x600?context=bWFzdGVyfHByZC1pbWFnZXN8MTk3Nzd8aW1hZ2UvanBlZ3xhR1ZsTDJnelpDOHhNRGM0TnpZeE5UTXdPVGcxTkM5d2NtUXRabkp2Ym5RdGJYQXRNREF3TkRrNE9UaGZOakF3ZURZd01BfGIzOWI1ZWJhY2Y5ZjM5MDY2Y2RhNDIzZTcyMzE2YjU0MDU0Nzg3ZDdiNGY0MmEzOTIzYmJmOTMwMTgxNmE2NDI",
+        "https://media.superdrug.com//medias/prd-back-mp-00049898-600x600?context=bWFzdGVyfHByZC1pbWFnZXN8MTYyODd8aW1hZ2UvanBlZ3xhREEzTDJneFpTOHhNRGM0TnpZeE5EY3lNREF6TUM5d2NtUXRZbUZqYXkxdGNDMHdNREEwT1RnNU9GODJNREI0TmpBd3xkODM1YmEzODU1MjUwNTVjNmViOTRmZjRhMDUzNjc4MmM4Mjc0NzgyOTA1OTJlMzM3Zjc4NDFhZjNmNjc2ZTJj",
+        "https://media.superdrug.com//medias/prd-side-mp-00049898-600x600?context=bWFzdGVyfHByZC1pbWFnZXN8MjExMTh8aW1hZ2UvanBlZ3xhRFJoTDJneE55OHhNRGM0TnpZeE5Ea3hOall6T0M5d2NtUXRjMmxrWlMxdGNDMHdNREEwT1RnNU9GODJNREI0TmpBd3xjOWJmNTE3NDk2YmY1N2RiMzI5OWYwMDEwZGMzMjQwNTNlNzk0ZGZhOTYwOGU2MGQ2YThiMTY4NDYzNzllN2U1"
+      ]
+    },
+    {
+      "uuid": "superdrug_2c70bd1eb1bf4400c07ae2aa70f013d20afb23f5",
+      "vendor": "superdrug",
+      "source_url": "https://www.superdrug.com/hair/hair-brushes/rock-ruddle-turtles-small-pure-bristle-hairbrush/p/mp-00012016",
+      "extracted_at": "2025-08-21T00:13:40.876Z",
+      "product_id": "mp-00012016",
+      "name": "Rock & Ruddle Turtles Small Pure Bristle Hairbrush",
+      "main_image": "https://media.superdrug.com//medias/prd-front-mp-00012016-600x600?context=bWFzdGVyfHByZC1pbWFnZXN8MTgwNzh8aW1hZ2UvanBlZ3xhRGN4TDJnM055ODVOalF5TlRrd01UQTVOekkyTDNCeVpDMW1jbTl1ZEMxdGNDMHdNREF4TWpBeE5sODJNREI0TmpBd3wyN2E3OGQ3M2FhYWQxMTA3ZmNhZTRmMjM4ODE0OTY5NWE1YTMzMjdjNGUwNTgzY2IwNTU2NTdjNWMxMGYzZTM4",
+      "images": [
+        "https://media.superdrug.com//medias/prd-front-mp-00012016-600x600?context=bWFzdGVyfHByZC1pbWFnZXN8MTgwNzh8aW1hZ2UvanBlZ3xhRGN4TDJnM055ODVOalF5TlRrd01UQTVOekkyTDNCeVpDMW1jbTl1ZEMxdGNDMHdNREF4TWpBeE5sODJNREI0TmpBd3wyN2E3OGQ3M2FhYWQxMTA3ZmNhZTRmMjM4ODE0OTY5NWE1YTMzMjdjNGUwNTgzY2IwNTU2NTdjNWMxMGYzZTM4"
+      ],
+      "price": "£35.00",
+      "stock_status": "Out of stock",
+      "weight": "",
+      "description": "A top-quality hairbrush with bristles that detangle and keep your hair beautiful and silky without pulling. The bristle pad can be removed for cleaning. The perfect gift or treat for yourself.",
+      "category": "HAIR BRUSHES",
+      "discount": "",
+      "product_url": "https://www.superdrug.com/hair/hair-brushes/rock-ruddle-turtles-small-pure-bristle-hairbrush/p/mp-00012016"
+    },
+    {
+      "uuid": "superdrug_4344c582323ce0c170021313dc572f2ba46f9d9a",
+      "vendor": "superdrug",
+      "source_url": "https://www.superdrug.com/skin/face-skin-care/face-serums/charlotte-tilbury-magic-serum-crystal-elixir-8ml/p/mp-00044341",
+      "extracted_at": "2025-08-21T00:13:37.605Z",
+      "product_id": "mp-00044341",
+      "name": "Charlotte Tilbury Magic Serum Crystal Elixir 8ml",
+      "main_image": "https://media.superdrug.com//medias/prd-front-mp-00044341-600x600?context=bWFzdGVyfHByZC1pbWFnZXN8MjMwNDV8aW1hZ2UvanBlZ3xhR0ZtTDJoa1lTOHhNRGN4T0RrMU5qTTRPRE00TWk5d2NtUXRabkp2Ym5RdGJYQXRNREF3TkRRek5ERmZOakF3ZURZd01BfGE4MGE0NGE3NDQxNTE0ZDIzZmI4NjYyMzI5ZWY2MjYwNjhkYjU5MWUzZGRhZGZjNmNhMWI1MWE3OTg2NzM1ZmI",
+      "images": [
+        "https://media.superdrug.com//medias/prd-front-mp-00044341-600x600?context=bWFzdGVyfHByZC1pbWFnZXN8MjMwNDV8aW1hZ2UvanBlZ3xhR0ZtTDJoa1lTOHhNRGN4T0RrMU5qTTRPRE00TWk5d2NtUXRabkp2Ym5RdGJYQXRNREF3TkRRek5ERmZOakF3ZURZd01BfGE4MGE0NGE3NDQxNTE0ZDIzZmI4NjYyMzI5ZWY2MjYwNjhkYjU5MWUzZGRhZGZjNmNhMWI1MWE3OTg2NzM1ZmI"
+      ],
+      "price": "£35.99",
+      "stock_status": "Out of stock",
+      "weight": "8ml",
+      "description": "Charlotte Tilbury Magic Serum Crystal Elixir 8ml is a premium face serum of Charlotte Tilbury brand.",
+      "category": "FACE SERUMS",
+      "discount": "",
+      "product_url": "https://www.superdrug.com/skin/face-skin-care/face-serums/charlotte-tilbury-magic-serum-crystal-elixir-8ml/p/mp-00044341"
+    },
+    {
+      "uuid": "superdrug_f91146733b18c4605935eecbf73c93624ef433d6",
+      "vendor": "superdrug",
+      "source_url": "https://www.superdrug.com/accessories-and-lifestyle/tights/fashion-patterned-tights/dublin-kids-performance-flex-knee-patch-riding-tights-25in/p/mp-00054895",
+      "extracted_at": "2025-08-21T00:16:32.419Z",
+      "product_id": "mp-00054895",
+      "name": "Dublin Kids Performance Flex Knee Patch Riding Tights (25in)",
+      "main_image": "https://media.superdrug.com//medias/prd-front-mp-00054895-600x600?context=bWFzdGVyfHByZC1pbWFnZXN8MTA0MTZ8aW1hZ2UvanBlZ3xhR1UwTDJnNE5pOHhNRGM0T1RFMk16RXpPVEV3TWk5d2NtUXRabkp2Ym5RdGJYQXRNREF3TlRRNE9UVmZOakF3ZURZd01BfGJlMDU1NjZmOTVkZjc2NTIyNDdmZmUwNTBiNGQyMjlmNzA0ZmIwNTIxYTc0MzFjMTg3MDQ1NWI3M2IzNzkzZWQ",
+      "images": [
+        "https://media.superdrug.com//medias/prd-front-mp-00054895-600x600?context=bWFzdGVyfHByZC1pbWFnZXN8MTA0MTZ8aW1hZ2UvanBlZ3xhR1UwTDJnNE5pOHhNRGM0T1RFMk16RXpPVEV3TWk5d2NtUXRabkp2Ym5RdGJYQXRNREF3TlRRNE9UVmZOakF3ZURZd01BfGJlMDU1NjZmOTVkZjc2NTIyNDdmZmUwNTBiNGQyMjlmNzA0ZmIwNTIxYTc0MzFjMTg3MDQ1NWI3M2IzNzkzZWQ"
+      ],
+      "price": "£23.05",
+      "stock_status": "Out of stock",
+      "weight": "25in",
+      "description": ".",
+      "category": "ACCESSORIES AND LIFESTYLE",
+      "discount": "10% off",
+      "product_url": "https://www.superdrug.com/accessories-and-lifestyle/tights/fashion-patterned-tights/dublin-kids-performance-flex-knee-patch-riding-tights-25in/p/mp-00054895"
+    },
+    {
+      "uuid": "superdrug_50330e30d80a2b3472b1a46c76aa0048dbc8a899",
+      "vendor": "superdrug",
+      "source_url": "https://www.superdrug.com/make-up/nails/nail-wraps/moyou-london-gel-nail-strip-goldilocks/p/mp-00017852",
+      "extracted_at": "2025-08-21T00:16:28.398Z",
+      "product_id": "mp-00017852",
+      "name": "MoYou-London Gel Nail Strip - Goldilocks",
+      "main_image": "https://media.superdrug.com//medias/prd-front-mp-00017852-600x600?context=bWFzdGVyfHByZC1pbWFnZXN8MzczNDd8aW1hZ2UvanBlZ3xhRGc0TDJoalpDOHhNRGN6TVRJNU1UUTNOVGs1T0M5d2NtUXRabkp2Ym5RdGJYQXRNREF3TVRjNE5USmZOakF3ZURZd01BfDQ2YjUwM2QxNDRmN2RkZmQ3YzlkMTgxZTQ4NWEyZWU2ZDc5NDAyYWQ3YTEyZWVjZGM5ODIyZDFhM2E4YzQ2YTE",
+      "images": [
+        "https://media.superdrug.com//medias/prd-front-mp-00017852-600x600?context=bWFzdGVyfHByZC1pbWFnZXN8MzczNDd8aW1hZ2UvanBlZ3xhRGc0TDJoalpDOHhNRGN6TVRJNU1UUTNOVGs1T0M5d2NtUXRabkp2Ym5RdGJYQXRNREF3TVRjNE5USmZOakF3ZURZd01BfDQ2YjUwM2QxNDRmN2RkZmQ3YzlkMTgxZTQ4NWEyZWU2ZDc5NDAyYWQ3YTEyZWVjZGM5ODIyZDFhM2E4YzQ2YTE"
+      ],
+      "price": "£12.99",
+      "stock_status": "Out of stock",
+      "weight": "",
+      "description": "Decorate your nails with beautiful patterns and stunning designs with MoYou London's Gel Strips! Made of real gel polish, lasts for up to 3 weeks without damaging the nail.",
+      "category": "NAIL WRAPS",
+      "discount": "",
+      "product_url": "https://www.superdrug.com/make-up/nails/nail-wraps/moyou-london-gel-nail-strip-goldilocks/p/mp-00017852"
+    },
+    {
+      "uuid": "superdrug_c0fbdbc928fa9a61bb3f9c9673152d39a144028b",
+      "vendor": "superdrug",
+      "source_url": "https://www.superdrug.com/skin/face-skin-care/expert-skin/blemish-prone-skin-care/la-roche-posay-effaclar-h-cleansing-cream-200ml/p/808810",
+      "extracted_at": "2025-08-21T00:18:43.528Z",
+      "product_id": "808810",
+      "name": "La Roche-Posay Effaclar H Cleansing Cream 200ml",
+      "main_image": "https://media.superdrug.com//medias/sys_master/prd-images/h59/hc6/10860373639198/prd-front-808810_600x600/prd-front-808810-600x600.jpg",
+      "images": [
+        "https://media.superdrug.com//medias/sys_master/prd-images/h59/hc6/10860373639198/prd-front-808810_600x600/prd-front-808810-600x600.jpg"
+      ],
+      "price": "£16.49",
+      "stock_status": "In stock",
+      "weight": "200ml",
+      "description": "Cleanse sensitive dehydrated and blemish-prone skin with La Roche-Posay Effaclar H Cleansing Cream.\n\nSuitable for face and body the ultra soothing hydrating formula is enriched with orellana extract shea butter and niacinamide to compensate skin discomfort and dryness caused by over-drying anti-blemish treatments.\n\nThe formula soothes the complexion providing a feeling of immediate comfort.",
+      "category": "BLEMISH PRONE SKIN CARE",
+      "discount": "Free Next Day Delivery when you buy selected Dermatological Skincare",
+      "product_url": "https://www.superdrug.com/skin/face-skin-care/expert-skin/blemish-prone-skin-care/la-roche-posay-effaclar-h-cleansing-cream-200ml/p/808810"
+    },
+    {
+      "uuid": "superdrug_101882988bace8d820632064c11f251b69b03f82",
+      "vendor": "superdrug",
+      "source_url": "https://www.superdrug.com/skin/eye-skincare/eye-masks/grace-stella-under-eye-mask-vegan-gold-24-pairs/p/mp-00027422",
+      "extracted_at": "2025-08-21T00:18:40.740Z",
+      "product_id": "mp-00027422",
+      "name": "Grace & Stella - Under Eye Mask - Vegan - Gold - 24 Pairs",
+      "main_image": "https://media.superdrug.com//medias/prd-front-mp-00027422-600x600?context=bWFzdGVyfHByZC1pbWFnZXN8NTExMzR8aW1hZ2UvanBlZ3xhREpqTDJneU5pOHhNREl4T0RNd01UazRNRGN3TWk5d2NtUXRabkp2Ym5RdGJYQXRNREF3TWpjME1qSmZOakF3ZURZd01BfDU1ZTIxNDAxYTNhYzVjODNhNGIwMjVkNTVkZjBkNDFhMTQyM2VkMjIwZTBiOWM2MGVmNjJhYzlhOGJhZjA2MDA",
+      "images": [
+        "https://media.superdrug.com//medias/prd-front-mp-00027422-600x600?context=bWFzdGVyfHByZC1pbWFnZXN8NTExMzR8aW1hZ2UvanBlZ3xhREpqTDJneU5pOHhNREl4T0RNd01UazRNRGN3TWk5d2NtUXRabkp2Ym5RdGJYQXRNREF3TWpjME1qSmZOakF3ZURZd01BfDU1ZTIxNDAxYTNhYzVjODNhNGIwMjVkNTVkZjBkNDFhMTQyM2VkMjIwZTBiOWM2MGVmNjJhYzlhOGJhZjA2MDA",
+        "https://www.superdrug.com/medias/sys_master/front-prd/front-prd/12139333451806/Grace-Stella-Under-Eye-Mask-Vegan-Gold-24-Pairs-838325.jpg",
+        "https://www.superdrug.com/medias/sys_master/front-prd/front-prd/12139333517342/Grace-Stella-Under-Eye-Mask-Vegan-Gold-24-Pairs-838325.jpg",
+        "https://www.superdrug.com/medias/sys_master/front-prd/front-prd/12139333582878/Grace-Stella-Under-Eye-Mask-Vegan-Gold-24-Pairs-838325.jpg",
+        "https://www.superdrug.com/medias/sys_master/front-prd/front-prd/12139333648414/Grace-Stella-Under-Eye-Mask-Vegan-Gold-24-Pairs-838325.jpg"
+      ],
+      "price": "£17.50",
+      "stock_status": "In stock",
+      "weight": "24 Pairs",
+      "description": "It's like an energy drink for your eyes! Superhero eye masks that have cooling and de-puffing powers to revitalize your tired eyes, giving you a youthful, awakened glow.",
+      "category": "EYE MASKS",
+      "discount": "",
+      "product_url": "https://www.superdrug.com/skin/eye-skincare/eye-masks/grace-stella-under-eye-mask-vegan-gold-24-pairs/p/mp-00027422"
+    },
+    {
+      "uuid": "superdrug_459b69b802f66ca175bcc644491cc98d3d1abaaf",
+      "vendor": "superdrug",
+      "source_url": "https://www.superdrug.com/fragrance/fragrance-for-him/mens-aftershave/proraso-italian-pre-shave-cream-shea-butter-100ml/p/mp-00009832",
+      "extracted_at": "2025-08-21T00:19:42.625Z",
+      "product_id": "mp-00009832",
+      "name": "Proraso Italian Pre Shave Cream Shea Butter 100ml",
+      "main_image": "https://media.superdrug.com//medias/prd-front-mp-00009832-600x600?context=bWFzdGVyfHByZC1pbWFnZXN8NzQ3MjJ8aW1hZ2UvanBlZ3xhRFkyTDJnMU1DODVOVFE1TURZME5UTTJNRGswTDNCeVpDMW1jbTl1ZEMxdGNDMHdNREF3T1Rnek1sODJNREI0TmpBd3xlYjZlNDMzNmNkMDYzYTA0NDg4NDM5ZjM2NDU4MTQ4NzQ3MWQ0MjE4MGJiYWRlYjM2NWViNGY0ZTAyNjVlNDY3",
+      "images": [
+        "https://media.superdrug.com//medias/prd-front-mp-00009832-600x600?context=bWFzdGVyfHByZC1pbWFnZXN8NzQ3MjJ8aW1hZ2UvanBlZ3xhRFkyTDJnMU1DODVOVFE1TURZME5UTTJNRGswTDNCeVpDMW1jbTl1ZEMxdGNDMHdNREF3T1Rnek1sODJNREI0TmpBd3xlYjZlNDMzNmNkMDYzYTA0NDg4NDM5ZjM2NDU4MTQ4NzQ3MWQ0MjE4MGJiYWRlYjM2NWViNGY0ZTAyNjVlNDY3",
+        "https://www.superdrug.com/medias/sys_master/front-prd/front-prd/12139500142622/Proraso-Italian-Pre-Shave-Cream-Shea-Butter-100ml-821309.jpg"
+      ],
+      "price": "£19.95",
+      "stock_status": "Out of stock",
+      "weight": "100ml",
+      "description": "A new product that takes advantage of two ingredients renowned for their skin-caring prowess, Proraso Pre-Shave Cream Sandalwood & Shea Butter is a fantastic means of readying your skin for shaving and makes even the coarsest bristly hair super-soft. It also preps your chosen shaving cream by providing it with a lubricated base, improving the ease in which razors can glide over skin. The cream even makes for a gorgeous soothing after-shave application, calling on all of Proraso's 80 years of barbering expertise.",
+      "category": "MEN'S AFTERSHAVE",
+      "discount": "",
+      "product_url": "https://www.superdrug.com/fragrance/fragrance-for-him/mens-aftershave/proraso-italian-pre-shave-cream-shea-butter-100ml/p/mp-00009832"
+    }
+  ]
+}

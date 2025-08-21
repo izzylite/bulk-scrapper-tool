@@ -10,6 +10,18 @@ const {
     createExclusionFilter
 } = require('../../tools/utils/exclusion');
 
+// Allowed top-level categories to include in outputs
+const ALLOWED_CATEGORIES = new Set([
+    'skin',
+    'make-up',
+    'hair',
+    'toiletries',
+    'fragrance',
+    'mens',
+    'baby',
+    'accessories-and-lifestyle'
+]);
+
 function parseArgs(argv) {
     const args = { input: '', output: '', limit: 0, directory: '', combined: false };
     for (let i = 2; i < argv.length; i++) {
@@ -97,6 +109,9 @@ function extractUrlsAndImages(xmlContent) {
     const seenSkus = new Set(); // Track unique SKU IDs
     let duplicateCount = 0;
     let excludedCount = 0;
+    if (ALLOWED_CATEGORIES && ALLOWED_CATEGORIES.size > 0 && hostname) {
+        console.log(`[INCLUDE] Restricting to allowed categories for ${hostname}: [${[...ALLOWED_CATEGORIES].map(e => `"${e}"`).join(', ')}]`);
+    }
     
     // Split into URL blocks
     const urlBlocks = xmlContent.split('<url>').slice(1); // Skip the first empty part
@@ -115,6 +130,22 @@ function extractUrlsAndImages(xmlContent) {
         if (exclusionFilter && !exclusionFilter(url)) {
             excludedCount++;
             continue; // Skip excluded URL
+        }
+        // Apply allowed-category filter
+        try {
+            const category = extractCategoryFromUrl(url);
+            if (ALLOWED_CATEGORIES && ALLOWED_CATEGORIES.size > 0) {
+                if (!category || !ALLOWED_CATEGORIES.has(category)) {
+                    excludedCount++;
+                    continue; // Skip not-included category
+                }
+            }
+        } catch (_) {
+            // If category parsing fails, treat as excluded when whitelist is active
+            if (ALLOWED_CATEGORIES && ALLOWED_CATEGORIES.size > 0) {
+                excludedCount++;
+                continue;
+            }
         }
         
         // Extract SKU ID from URL
@@ -166,6 +197,47 @@ function extractUrlsAndImages(xmlContent) {
     console.log(`- Total URLs processed: ${extracted.length + duplicateCount + excludedCount}`);
     
     return { items: extracted, duplicateCount: duplicateCount, excludedCount: excludedCount };
+}
+
+function isMarketplaceUrl(url) {
+    return typeof url === 'string' && url.toLowerCase().includes('online-marketplace-root');
+}
+
+function splitByMarketplace(items) {
+    const superdrugs = [];
+    const marketplace = [];
+    for (const item of items) {
+        if (item && isMarketplaceUrl(item.url)) {
+            marketplace.push(item);
+        } else {
+            superdrugs.push(item);
+        }
+    }
+    return { superdrugs, marketplace };
+}
+
+function extractCategoryFromUrl(url) {
+    try {
+        const parsed = new URL(url);
+        const segments = parsed.pathname.split('/').filter(Boolean);
+        if (segments.length === 0) return null;
+        const startIndex = segments[0] === 'online-marketplace-root' ? 1 : 0;
+        if (startIndex >= segments.length) return null;
+        return segments[startIndex].toLowerCase();
+    } catch (_) {
+        return null;
+    }
+}
+
+function buildCategorySummary(items) {
+    const counts = {};
+    for (const item of items) {
+        const category = extractCategoryFromUrl(item.url);
+        if (!category) continue;
+        counts[category] = (counts[category] || 0) + 1;
+    }
+    const list = Object.keys(counts).sort();
+    return { list, counts };
 }
 
 function findXmlFiles(directory) {
@@ -257,27 +329,51 @@ function processDirectory(directoryPath, outputPath, limit, combined) {
             console.log(`\nApplied global limit: ${limit} items (out of ${allExtracted.length} total)`);
         }
         
-        // Determine output path for combined file
-        const combinedOutputPath = path.join(outputDir, 'combined-urls.json');
-        
-        // Create simplified data and output object
+        // Create simplified data and split
         const simplifiedData = finalData.map(item => ({
             url: item.url,
             sku_id: item.sku_id,
             image_url: item.image_url
         }));
+        const split = splitByMarketplace(simplifiedData);
         
-        const outputData = {
-            total_count: finalData.length,
+        // Determine output paths for split files
+        const superdrugsCombinedPath = path.join(outputDir, 'superdrugs_combined-urls.output.json');
+        const marketplaceCombinedPath = path.join(outputDir, 'marketplace_combined-urls.output.json');
+
+        const superCats = buildCategorySummary(split.superdrugs);
+        const marketCats = buildCategorySummary(split.marketplace);
+
+        const superData = {
+            total_count: split.superdrugs.length,
             source_files: xmlFiles.map(f => path.basename(f)),
-            items: simplifiedData
+            categories: superCats.list,
+            category_counts: superCats.counts,
+            items: split.superdrugs,
+            
         };
-        
-        fs.writeFileSync(combinedOutputPath, JSON.stringify(outputData, null, 2), 'utf8');
-        console.log(`\n=== COMBINED RESULTS ===`);
-        console.log(`Combined data saved to: ${combinedOutputPath}`);
+        const marketData = {
+            total_count: split.marketplace.length,
+            source_files: xmlFiles.map(f => path.basename(f)),
+            categories: marketCats.list,
+            category_counts: marketCats.counts,
+            items: split.marketplace,
+        };
+
+        fs.writeFileSync(superdrugsCombinedPath, JSON.stringify(superData, null, 2), 'utf8');
+        fs.writeFileSync(marketplaceCombinedPath, JSON.stringify(marketData, null, 2), 'utf8');
+
+        console.log(`\n=== COMBINED RESULTS (SPLIT) ===`);
+        console.log(`Saved Superdrugs data to: ${superdrugsCombinedPath}`);
+        console.log(`Saved Marketplace data to: ${marketplaceCombinedPath}`);
         console.log(`- Final unique URLs: ${finalData.length}`);
         console.log(`- URLs with images: ${finalData.filter(item => item.image_url).length}`);
+        console.log(`- Superdrugs products: ${split.superdrugs.length}`);
+        console.log(`- Marketplace products: ${split.marketplace.length}`);
+        console.log(`- Superdrugs categories: ${superCats.list.length}`);
+        console.log(`- Marketplace categories: ${marketCats.list.length}`);
+        console.log(`- Superdrugs category list: ${superCats.list.join(', ')}`);
+        console.log(`- Marketplace category list: ${marketCats.list.join(', ')}`);
         console.log(`- Source files: ${xmlFiles.length}`);
         console.log(`\n=== FILTERING STATISTICS ===`);
         console.log(`- Within-file duplicates: ${totalDuplicates}`);
@@ -295,9 +391,10 @@ function processDirectory(directoryPath, outputPath, limit, combined) {
             const duplicateCount = result.duplicateCount;
             const excludedCount = result.excludedCount;
             
-            // Generate output path for this file
+            // Generate output paths for this file (split)
             const inputName = path.basename(xmlFile, path.extname(xmlFile));
-            const fileOutputPath = path.join(outputDir, `${inputName}.json`);
+            const superFileOutputPath = path.join(outputDir, `superdrugs_${inputName}.output.json`);
+            const marketFileOutputPath = path.join(outputDir, `marketplace_${inputName}.output.json`);
             
             // Create simplified data and output object
             const simplifiedData = extracted.map(item => ({
@@ -305,18 +402,37 @@ function processDirectory(directoryPath, outputPath, limit, combined) {
                 sku_id: item.sku_id,
                 image_url: item.image_url
             }));
+            const split = splitByMarketplace(simplifiedData);
             
-            const outputData = {
-                total_count: extracted.length,
+            const superCats = buildCategorySummary(split.superdrugs);
+            const marketCats = buildCategorySummary(split.marketplace);
+
+            const superOut = {
+                total_count: split.superdrugs.length,
                 source_file: path.basename(xmlFile),
-                duplicates_removed: duplicateCount,
-                excluded_count: excludedCount,
-                items: simplifiedData
+                items: split.superdrugs,
+                categories: superCats.list,
+                category_counts: superCats.counts
             };
-            
-            fs.writeFileSync(fileOutputPath, JSON.stringify(outputData, null, 2), 'utf8');
-            console.log(`Data saved to: ${fileOutputPath}`);
+            const marketOut = {
+                total_count: split.marketplace.length,
+                source_file: path.basename(xmlFile),
+                items: split.marketplace,
+                categories: marketCats.list,
+                category_counts: marketCats.counts
+            };
+
+            fs.writeFileSync(superFileOutputPath, JSON.stringify(superOut, null, 2), 'utf8');
+            fs.writeFileSync(marketFileOutputPath, JSON.stringify(marketOut, null, 2), 'utf8');
+            console.log(`Saved Superdrugs data to: ${superFileOutputPath}`);
+            console.log(`Saved Marketplace data to: ${marketFileOutputPath}`);
             console.log(`- Unique URLs: ${extracted.length}, Duplicates: ${duplicateCount}, Excluded: ${excludedCount}`);
+            console.log(`- Superdrugs products: ${split.superdrugs.length}`);
+            console.log(`- Marketplace products: ${split.marketplace.length}`);
+            console.log(`- Superdrugs categories: ${superCats.list.length}`);
+            console.log(`- Marketplace categories: ${marketCats.list.length}`);
+            console.log(`- Superdrugs category list: ${superCats.list.join(', ')}`);
+            console.log(`- Marketplace category list: ${marketCats.list.join(', ')}`);
             
             const withImages = extracted.filter(item => item.image_url).length;
             results.push({
@@ -325,7 +441,7 @@ function processDirectory(directoryPath, outputPath, limit, combined) {
                 withImages: withImages,
                 duplicatesRemoved: duplicateCount,
                 excludedCount: excludedCount,
-                outputPath: fileOutputPath
+                outputPath: `${path.basename(superFileOutputPath)} | ${path.basename(marketFileOutputPath)}`
             });
         }
         
@@ -429,43 +545,65 @@ function main() {
             console.log(`Extracted ${extracted.length} URL entries`);
         }
         
-        // Determine output path
-        let outputPath;
-        if (output) {
-            outputPath = path.resolve(output);
-        } else {
-            const inputDir = path.dirname(inputPath);
-            const outputDir = path.join(inputDir, 'output');
-            
-            // Create output directory if it doesn't exist
-            if (!fs.existsSync(outputDir)) {
-                fs.mkdirSync(outputDir, { recursive: true });
-                console.log(`Created output directory: ${outputDir}`);
-            }
-            
-            const inputName = path.basename(inputPath, path.extname(inputPath));
-            outputPath = path.join(outputDir, `${inputName}.json`);
-        }
-        
         // Create simple format with url, sku_id, and image_url
         const simplifiedData = finalData.map(item => ({
             url: item.url,
             sku_id: item.sku_id,
             image_url: item.image_url
         }));
-        
-        // Create output object with total_count, duplicate, and exclusion info
-        const outputData = {
-            total_count: finalData.length,
+        const split = splitByMarketplace(simplifiedData);
+
+        // Determine output directory and base name for two files
+        let outputDir;
+        let baseName;
+        if (output) {
+            const resolved = path.resolve(output);
+            if (fs.existsSync(resolved) && fs.statSync(resolved).isDirectory()) {
+                outputDir = resolved;
+                baseName = path.basename(inputPath, path.extname(inputPath));
+            } else {
+                outputDir = path.dirname(resolved);
+                baseName = path.basename(resolved, path.extname(resolved));
+                if (!fs.existsSync(outputDir)) {
+                    fs.mkdirSync(outputDir, { recursive: true });
+                    console.log(`Created output directory: ${outputDir}`);
+                }
+            }
+        } else {
+            const inputDir = path.dirname(inputPath);
+            outputDir = path.join(inputDir, 'output');
+            if (!fs.existsSync(outputDir)) {
+                fs.mkdirSync(outputDir, { recursive: true });
+                console.log(`Created output directory: ${outputDir}`);
+            }
+            baseName = path.basename(inputPath, path.extname(inputPath));
+        }
+
+        const superOutputPath = path.join(outputDir, `superdrugs_${baseName}.output.json`);
+        const marketOutputPath = path.join(outputDir, `marketplace_${baseName}.output.json`);
+
+        const superCats = buildCategorySummary(split.superdrugs);
+        const marketCats = buildCategorySummary(split.marketplace);
+
+        const superOut = {
+            total_count: split.superdrugs.length,
             source_file: path.basename(inputPath),
-            duplicates_removed: duplicateCount,
-            excluded_count: excludedCount,
-            items: simplifiedData
+            items: split.superdrugs,
+            categories: superCats.list,
+            category_counts: superCats.counts
         };
-        
-        // Write the data with total_count
-        fs.writeFileSync(outputPath, JSON.stringify(outputData, null, 2), 'utf8');
-        console.log(`URL and image data saved to: ${outputPath}`);
+        const marketOut = {
+            total_count: split.marketplace.length,
+            source_file: path.basename(inputPath),
+            items: split.marketplace,
+            categories: marketCats.list,
+            category_counts: marketCats.counts
+        };
+
+        fs.writeFileSync(superOutputPath, JSON.stringify(superOut, null, 2), 'utf8');
+        fs.writeFileSync(marketOutputPath, JSON.stringify(marketOut, null, 2), 'utf8');
+        console.log(`Saved Superdrugs data to: ${superOutputPath}`);
+        console.log(`Saved Marketplace data to: ${marketOutputPath}`);
         
         // Log some statistics
         const withImages = finalData.filter(item => item.image_url).length;
@@ -475,14 +613,25 @@ function main() {
         console.log(`- URLs without images: ${finalData.length - withImages}`);
         console.log(`- Duplicates removed: ${duplicateCount}`);
         console.log(`- Excluded URLs: ${excludedCount}`);
+        console.log(`- Superdrugs products: ${split.superdrugs.length}`);
+        console.log(`- Marketplace products: ${split.marketplace.length}`);
+        console.log(`- Superdrugs categories: ${superCats.list.length}`);
+        console.log(`- Marketplace categories: ${marketCats.list.length}`);
+        console.log(`- Superdrugs category list: ${superCats.list.join(', ')}`);
+        console.log(`- Marketplace category list: ${marketCats.list.join(', ')}`);
         
-        if (finalData.length > 0) {
-            console.log(`\nFirst few URLs:`);
-            finalData.slice(0, 3).forEach((item, idx) => {
+        // Optionally preview a few from each split
+        const previewCount = 3;
+        if (split.superdrugs.length > 0) {
+            console.log(`\nFirst few Superdrugs URLs:`);
+            split.superdrugs.slice(0, previewCount).forEach((item, idx) => {
                 console.log(`${idx + 1}. ${item.url}`);
-                if (item.image_url) {
-                    console.log(`   Image: ${item.image_url}`);
-                }
+            });
+        }
+        if (split.marketplace.length > 0) {
+            console.log(`\nFirst few Marketplace URLs:`);
+            split.marketplace.slice(0, previewCount).forEach((item, idx) => {
+                console.log(`${idx + 1}. ${item.url}`);
             });
         }
     }

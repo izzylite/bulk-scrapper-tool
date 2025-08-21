@@ -1,0 +1,284 @@
+'use strict';
+
+const fs = require('fs');
+const path = require('path');
+
+const PROCESSING_DIR = path.resolve(process.cwd(), 'scrapper/processing');
+
+/**
+ * Ensures that the processing directory exists
+ */
+function ensureProcessingDirectoryExists() {
+    if (!fs.existsSync(PROCESSING_DIR)) {
+        fs.mkdirSync(PROCESSING_DIR, { recursive: true });
+        console.log(`[PENDING] Created processing directory: ${PROCESSING_DIR}`);
+    }
+}
+
+/**
+ * Gets all processing files from the processing directory
+ * @returns {Array} Array of processing file objects with metadata
+ */
+function getProcessingFiles() {
+    ensureProcessingDirectoryExists();
+    
+    try {
+        const files = fs.readdirSync(PROCESSING_DIR)
+            .filter(file => file.endsWith('.json'))
+            .map(file => {
+                const filePath = path.join(PROCESSING_DIR, file);
+                try {
+                    const stats = fs.statSync(filePath);
+                    const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+                    return {
+                        name: file,
+                        path: filePath,
+                        active: data.active === true,
+                        vendor: data.vendor || 'unknown',
+                        total_count: data.total_count || 0,
+                        processed_count: data.processed_count || 0,
+                        remaining_count: (data.items || []).length,
+                        modified: stats.mtime
+                    };
+                } catch (err) {
+                    console.warn(`[PENDING] Failed to read processing file ${file}:`, err.message);
+                    return null;
+                }
+            })
+            .filter(Boolean)
+            .sort((a, b) => b.modified.getTime() - a.modified.getTime());
+        
+        return files;
+    } catch (err) {
+        console.warn('[PENDING] Failed to read processing directory:', err.message);
+        return [];
+    }
+}
+
+/**
+ * Finds the active processing file (active: true)
+ * @returns {Object|null} Active processing file metadata or null if none found
+ */
+function findActiveProcessingFile() {
+    const files = getProcessingFiles();
+    const activeFiles = files.filter(file => file.active);
+    
+    if (activeFiles.length === 0) {
+        return null;
+    }
+    
+    if (activeFiles.length > 1) {
+        console.warn(`[PENDING] Multiple active processing files found (${activeFiles.length}), using most recent`);
+        activeFiles.forEach((file, index) => {
+            if (index > 0) {
+                console.log(`[PENDING] Deactivating older file: ${file.name}`);
+                deactivateProcessingFile(file.path);
+            }
+        });
+    }
+    
+    return activeFiles[0];
+}
+
+/**
+ * Deactivates a processing file by setting active: false
+ * @param {string} filePath - Path to processing file
+ */
+function deactivateProcessingFile(filePath) {
+    try {
+        const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+        data.active = false;
+        fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf8');
+        console.log(`[PENDING] Deactivated processing file: ${path.basename(filePath)}`);
+    } catch (err) {
+        console.warn(`[PENDING] Failed to deactivate processing file ${filePath}:`, err.message);
+    }
+}
+
+/**
+ * Validates processing file structure
+ * Expected: {active:true/false, vendor:"", total_count:0, processed_count:0, exclude:[] (optional), source_files:[] (optional), items:[{url, vendor, image_url, sku}]}
+ * @param {Object} data - Processing file data
+ * @returns {boolean} True if valid
+ */
+function validateProcessingFileStructure(data) {
+    if (!data || typeof data !== 'object') return false;
+    
+    // Check required fields
+    if (typeof data.active !== 'boolean') return false;
+    if (typeof data.vendor !== 'string') return false;
+    if (typeof data.total_count !== 'number') return false;
+    if (typeof data.processed_count !== 'number') return false;
+    if (!Array.isArray(data.items)) return false;
+    
+    // Check optional fields
+    if (data.exclude !== undefined && !Array.isArray(data.exclude)) return false;
+    if (data.source_files !== undefined && !Array.isArray(data.source_files)) return false;
+    
+    // Validate items structure
+    for (const item of data.items) {
+        if (!item || typeof item !== 'object') return false;
+        if (!item.url || typeof item.url !== 'string') return false;
+        if (!item.vendor || typeof item.vendor !== 'string') return false;
+        // image_url and sku are optional
+    }
+    
+    return true;
+}
+
+// Per-file write lock to safely append/update JSON from concurrent workers
+const __fileLocks = new Map();
+function withFileLock(filePath, fn) {
+	const prev = __fileLocks.get(filePath) || Promise.resolve();
+	const next = prev.then(fn, fn);
+	__fileLocks.set(filePath, next.catch(() => {}));
+	return next;
+}
+
+// Update error information for specific URLs in the processing file
+async function updateErrorsInProcessingFile(processingFilePath, errorItems) {
+	if (!processingFilePath || !fs.existsSync(processingFilePath)) return;
+	if (!Array.isArray(errorItems) || errorItems.length === 0) return;
+	
+	// Create a map of URL -> error info for quick lookup
+	const errorMap = new Map();
+	errorItems.forEach(item => {
+		if (item && item.source_url && item.error) {
+			errorMap.set(item.source_url, {
+				error: item.error,
+				error_timestamp: new Date().toISOString(),
+				retry_count: (item.retry_count || 0) + 1
+			});
+		}
+	});
+	
+	await withFileLock(processingFilePath, async () => {
+		try {
+			const data = JSON.parse(fs.readFileSync(processingFilePath, 'utf8'));
+			
+			if (!Array.isArray(data?.items)) {
+				console.warn(`[WARNING] Processing file format not recognized, expected { items: [...] }`);
+				return;
+			}
+			
+			// Update items that have errors
+			let updatedCount = 0;
+			data.items = data.items.map(item => {
+				if (item && item.url && errorMap.has(item.url)) {
+					const errorInfo = errorMap.get(item.url);
+					updatedCount++;
+					return {
+						...item,
+						...errorInfo
+					};
+				}
+				return item;
+			});
+			
+			if (updatedCount > 0) {
+				fs.writeFileSync(processingFilePath, JSON.stringify(data, null, 2), 'utf8');
+				console.log(`[ERROR-UPDATE] Updated ${updatedCount} items with error information in processing file`);
+			}
+		} catch (err) {
+			console.warn(`[WARNING] Failed to update errors in processing file:`, err.message);
+		}
+	});
+}
+
+// Batch remove a list/set of URLs from the processing file in a single locked write
+async function removeUrlsFromProcessingFile(processingFilePath, urlsToRemove) {
+	if (!processingFilePath || !fs.existsSync(processingFilePath)) return;
+	const toRemove = Array.isArray(urlsToRemove) ? new Set(urlsToRemove) : new Set(urlsToRemove || []);
+	if (toRemove.size === 0) return;
+	await withFileLock(processingFilePath, async () => {
+		try {
+			const data = JSON.parse(fs.readFileSync(processingFilePath, 'utf8'));
+			
+			if (!Array.isArray(data?.items)) {
+				console.warn(`[WARNING] Processing file format not recognized, expected { items: [...] }`);
+				return;
+			}
+			
+			const originalLength = data.items.length;
+			const filteredItems = data.items.filter(item => !toRemove.has(item.url));
+			const removedCount = originalLength - filteredItems.length;
+			
+			if (filteredItems.length === 0) {
+				// Mark as inactive and clear items
+				data.active = false;
+				data.items = [];
+				data.processed_count = data.total_count || 0;
+				fs.writeFileSync(processingFilePath, JSON.stringify(data, null, 2), 'utf8');
+				console.log(`[COMPLETE] Processing file completed and deactivated - all URLs processed`);
+				return;
+			}
+			
+			if (removedCount > 0) {
+				// Update processed_count by incrementing it with successfully removed count
+				const newProcessedCount = (data.processed_count || 0) + removedCount;
+				
+				// Update the data structure
+				data.items = filteredItems;
+				data.processed_count = newProcessedCount;
+				
+				fs.writeFileSync(processingFilePath, JSON.stringify(data, null, 2), 'utf8');
+				
+				// Show simple progress (note: only successful items are removed and counted)
+				if (typeof data.total_count === 'number') {
+					const progressPercent = ((newProcessedCount / data.total_count) * 100).toFixed(1);
+					console.log(`[PROGRESS] ${filteredItems.length} URLs remaining (${newProcessedCount}/${data.total_count} processed, ${progressPercent}%) - batch removed ${removedCount}`);
+				} else {
+					console.log(`[PROGRESS] ${filteredItems.length} URLs remaining in processing file (batch removed ${removedCount})`);
+				}
+			}
+		} catch (err) {
+			console.warn(`[WARNING] Failed to batch-remove URLs from processing file:`, err.message);
+		}
+	});
+}
+
+function cleanupProcessingFile(processingFilePath, processingFileName) {
+	try {
+		if (fs.existsSync(processingFilePath)) {
+			const remainingData = JSON.parse(fs.readFileSync(processingFilePath, 'utf8'));
+			
+			if (!Array.isArray(remainingData?.items)) {
+				console.warn(`[WARNING] Processing file format not recognized during cleanup`);
+				return;
+			}
+			
+			const remainingCount = remainingData.items.length;
+			
+			if (remainingCount === 0) {
+				// Deactivate completed processing file
+				remainingData.active = false;
+				fs.writeFileSync(processingFilePath, JSON.stringify(remainingData, null, 2), 'utf8');
+				console.log(`[CLEANUP] Processing file completed and deactivated`);
+			} else {
+				if (typeof remainingData.total_count === 'number' && typeof remainingData.processed_count === 'number') {
+					const progressPercent = ((remainingData.processed_count / remainingData.total_count) * 100).toFixed(1);
+					console.log(`[INCOMPLETE] ${remainingCount} items remain (${remainingData.processed_count}/${remainingData.total_count} processed, ${progressPercent}%)`);
+				} else {
+					console.log(`[INCOMPLETE] ${remainingCount} items remain in processing file for retry`);
+				}
+				console.log(`[RESUME] To retry failed URLs, run the extractor again - it will resume from ${processingFileName || path.basename(processingFilePath)}`);
+			}
+		}
+	} catch (cleanupError) {
+		console.warn(`[WARNING] Could not check processing file status:`, cleanupError.message);
+	}
+}
+
+module.exports = {
+	withFileLock, 
+	removeUrlsFromProcessingFile,
+	updateErrorsInProcessingFile,
+	cleanupProcessingFile,
+	// New processing directory functions
+	ensureProcessingDirectoryExists,
+	getProcessingFiles,
+	findActiveProcessingFile,
+	deactivateProcessingFile,
+	validateProcessingFileStructure,
+	PROCESSING_DIR
+};

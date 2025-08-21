@@ -1,0 +1,70 @@
+{
+  "superdrug": {
+    "last_llm_extraction": {
+      "timestamp": "2025-08-21T00:20:04.782Z",
+      "attempted_fields": [
+        "name",
+        "main_image",
+        "images",
+        "price",
+        "stock_status",
+        "weight",
+        "description",
+        "category",
+        "discount"
+      ],
+      "results": {
+        "name": {
+          "found": true,
+          "value_type": "string"
+        },
+        "main_image": {
+          "found": true,
+          "value_type": "string"
+        },
+        "images": {
+          "found": true,
+          "value_type": "array"
+        },
+        "price": {
+          "found": true,
+          "value_type": "string"
+        },
+        "stock_status": {
+          "found": true,
+          "value_type": "string"
+        },
+        "weight": {
+          "found": true,
+          "value_type": "string"
+        },
+        "description": {
+          "found": true,
+          "value_type": "string"
+        },
+        "category": {
+          "found": true,
+          "value_type": "string"
+        },
+        "discount": {
+          "found": false,
+          "value_type": "string"
+        }
+      }
+    },
+    "selectors": {
+      "name": [
+        {
+          "selector": "xpath=/html[1]/body[1]/app-root[1]/cx-storefront[1]/main[1]/cx-page-layout[1]/e2-product-outlets[1]/div[1]/section[1]/cx-page-layout[1]/cx-page-slot[1]/mp-product-add-to-cart[1]/e2-product-details-title[1]/div[1]/h1[1]",
+          "type": "xpath",
+          "learned_at": "2025-08-21T00:20:21.347Z",
+          "success_count": 1,
+          "failure_count": 0,
+          "last_success": "2025-08-21T00:20:21.347Z",
+          "last_failure": null,
+          "confidence_score": 1
+        }
+      ]
+    }
+  }
+}
