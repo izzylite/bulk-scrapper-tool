@@ -82,6 +82,12 @@ function isValidHttpUrl(value) {
     return cleanAndValidateUrl(value) !== null;
 }
 
+// Check if we have valid core product data (name AND either price OR out of stock status)
+function hasValidCoreData(data) {
+    return data && data.name && 
+        (data.price || (data.stock_status && data.stock_status.toLowerCase().includes('out of stock')));
+}
+
 function loadVendorSelectors() {
     try {
         const p = path.resolve(process.cwd(), 'tools/utils/cache/vendor-selectors.json');
@@ -118,86 +124,103 @@ function saveVendorSelectors(vendor, partial) {
         const all = loadVendorSelectors();
         const prev = all[vendor] || {};
         
-        // Handle both old format (direct fields) and new format (selectors array)
-        if (partial.selectors) {
-            // New format: append to selector arrays instead of overriding
-            if (!prev.selectors) prev.selectors = {};
+        // Handle backward compatibility with old format (single selectors as strings)
+        if (!prev.selectors && Object.keys(prev).some(key => key !== 'last_llm_extraction')) {
+            // Convert old format to new format
+            const converted = { selectors: {} };
+            const now = new Date().toISOString();
             
-            for (const [field, newSelector] of Object.entries(partial.selectors)) {
-                // Initialize field array if it doesn't exist
-                if (!prev.selectors[field]) {
-                    prev.selectors[field] = [];
-                } else if (!Array.isArray(prev.selectors[field])) {
-                    // Convert non-array to array format
-                    console.log(`[SELECTOR-SAVE] Converting ${vendor}.${field} from string to array format`);
-                    const oldSelector = prev.selectors[field];
-                    prev.selectors[field] = [{
-                        selector: typeof oldSelector === 'string' ? oldSelector : oldSelector.selector || oldSelector,
-                        type: (typeof oldSelector === 'string' ? oldSelector : oldSelector.selector || oldSelector).startsWith('xpath=') ? 'xpath' : 'css',
-                        learned_at: new Date().toISOString(),
-                        success_count: 0,
-                        failure_count: 0,
-                        last_success: null,
-                        last_failure: null,
-                        confidence_score: 1.0
+            for (const [field, selector] of Object.entries(prev)) {
+                if (field !== 'last_llm_extraction' && typeof selector === 'string') {
+                    converted.selectors[field] = [{
+                        selector,
+                        learned_at: now,
+                        success_count: 1,
+                        last_success: now
                     }];
                 }
-                
-                // Check if this selector already exists
-                const selectorString = typeof newSelector === 'string' ? newSelector : newSelector.selector;
-                const existingIndex = prev.selectors[field].findIndex(s => 
-                    (s.selector || s) === selectorString
-                );
-                
-                if (existingIndex >= 0) {
-                    // Update existing selector
-                    if (typeof newSelector === 'object') {
-                        prev.selectors[field][existingIndex] = { ...prev.selectors[field][existingIndex], ...newSelector };
-                    }
-                } else {
-                    // Add new selector
-                    const selectorObj = typeof newSelector === 'string' ? {
-                        selector: newSelector,
-                        type: newSelector.startsWith('xpath=') ? 'xpath' : 'css',
-                        learned_at: new Date().toISOString(),
-                        success_count: 0,
-                        failure_count: 0,
-                        last_success: null,
-                        last_failure: null,
-                        confidence_score: 1.0
-                    } : newSelector;
-                    
-                    prev.selectors[field].push(selectorObj);
-                    console.log(`[SELECTOR-HISTORY] Added new ${field} selector for ${vendor}: ${selectorString}`);
-                }
             }
             
-            all[vendor] = { ...prev, ...partial };
-        } else {
-            // Old format: convert to new format
-            const selectorsToAdd = {};
-            for (const [field, selector] of Object.entries(partial)) {
-                if (field !== 'last_llm_extraction') {
-                    selectorsToAdd[field] = selector;
-                }
+            // Preserve last_llm_extraction if it exists
+            if (prev.last_llm_extraction) {
+                converted.last_llm_extraction = prev.last_llm_extraction;
             }
             
-            if (Object.keys(selectorsToAdd).length > 0) {
-                saveVendorSelectors(vendor, { selectors: selectorsToAdd });
-                return;
-            }
-            
-            all[vendor] = { ...prev, ...partial };
+            all[vendor] = converted;
         }
         
+        const current = all[vendor] || {};
+        
+        // Normalize existing success_count values that exceed the maximum (cap at 10)
+        if (current.selectors) {
+            for (const [field, selectorArray] of Object.entries(current.selectors)) {
+                if (Array.isArray(selectorArray)) {
+                    for (const selectorObj of selectorArray) {
+                        if (selectorObj.success_count > 10) {
+                            selectorObj.success_count = 10;
+                        }
+                    }
+                }
+            }
+        }
+        
+        if (!current.selectors) {
+            current.selectors = {};
+        }
+        
+        // Add new selectors to the history
+        const now = new Date().toISOString();
+        for (const [field, selector] of Object.entries(partial)) {
+            if (field === 'last_llm_extraction') {
+                // Handle LLM extraction metadata separately
+                current[field] = selector;
+                continue;
+            }
+            
+            if (typeof selector === 'string' && selector.trim()) {
+                if (!current.selectors[field]) {
+                    current.selectors[field] = [];
+                }
+                
+                // Check if this selector already exists in the history
+                const existingIndex = current.selectors[field].findIndex(s => s.selector === selector);
+                
+                if (existingIndex >= 0) {
+                    // Update existing selector's success count and last success (cap at 10 to prevent overhead)
+                    const currentSelector = current.selectors[field][existingIndex];
+                    if (currentSelector.success_count < 10) {
+                        currentSelector.success_count += 1;
+                        currentSelector.last_success = now;
+                        
+                        // Move successful selector to the front for priority
+                        current.selectors[field].splice(existingIndex, 1);
+                        current.selectors[field].unshift(currentSelector);
+                    }
+                    // If success_count is already 10, don't increment or move (avoid unnecessary I/O)
+                } else {
+                    // Add new selector to the beginning of the array (highest priority)
+                    current.selectors[field].unshift({
+                        selector,
+                        learned_at: now,
+                        success_count: 1,
+                        last_success: now
+                    });
+                    
+                    // Keep only the most recent 5 selectors per field to prevent unlimited growth
+                    if (current.selectors[field].length > 5) {
+                        current.selectors[field] = current.selectors[field].slice(0, 5);
+                    }
+                }
+            }
+        }
+        
+        all[vendor] = current;
         fs.writeFileSync(p, JSON.stringify(all, null, 2), 'utf8');
         
         // Update cache since file changed
         cacheManager.set('vendorSelectors', null, all);
         cacheManager.set('vendorSelectorsLastModified', null, Date.now());
-    } catch (error) {
-        console.log(`[SELECTOR-SAVE] Failed to save vendor selectors: ${error.message}`);
-    }
+    } catch {}
 }
 
 function updateExtractionSnapshot(vendor, attemptedFields, extractedData) {
@@ -238,18 +261,25 @@ function updateExtractionSnapshot(vendor, attemptedFields, extractedData) {
 async function learnAndCacheSelectors(page, vendor, item) {
     // Only attempt when we have some values to learn from
     if (!item || typeof item !== 'object') return;
-    const existing = loadVendorSelectors()[vendor];
+    const vendorData = loadVendorSelectors()[vendor];
     
     const learned = {};
     // Learn selectors for static fields, main_image, and stock_status (which often has consistent patterns)
     // Truly dynamic fields (images array) will always use LLM
     const fieldsToLearn = ['name', 'price', 'main_image', 'weight', 'description', 'category', 'discount', 'stock_status'];
     
-     
-    
     // Prepare fields that need learning
     const fieldsToProcess = fieldsToLearn.filter(field => {
-        if (existing && existing[field]) return false; // Skip if already have selector
+        // Check if we already have selectors for this field (new array format)
+        if (vendorData && vendorData.selectors && Array.isArray(vendorData.selectors[field]) && vendorData.selectors[field].length > 0) {
+            return false; // Skip if already have selectors in new format
+        }
+        
+        // Backward compatibility: check old format
+        if (vendorData && vendorData[field] && typeof vendorData[field] === 'string') {
+            return false; // Skip if already have selector in old format
+        }
+        
         const value = String(item[field] || '').trim();
         return !!value; // Only include fields with values
     });
@@ -356,75 +386,79 @@ async function learnAndCacheSelectors(page, vendor, item) {
     }
 }
 
+// Helper function to try multiple selectors for a field
+async function trySelectorsForField(page, field, selectors, timeout = 10000) {
+    if (!Array.isArray(selectors) || selectors.length === 0) {
+        return { field, value: null, successfulSelector: null };
+    }
+    
+    // Try selectors in order (most successful first)
+    for (const selectorObj of selectors) {
+        const selector = selectorObj.selector;
+        if (!selector) continue;
+        
+        try {
+            let value = null;
+            
+            if (field === 'main_image') {
+                const src = await page.locator(selector).first().getAttribute('src', { timeout });
+                value = src ? cleanAndValidateUrl(src.trim()) : null;
+            } else if (field === 'stock_status') {
+                const isVisible = await page.locator(selector).first().isVisible({ timeout });
+                if (isVisible) {
+                    const text = await page.locator(selector).first().innerText({ timeout: 5000 });
+                    const isOutOfStock = /out of stock|sold out|unavailable|not available/i.test(text);
+                    value = isOutOfStock ? 'Out of stock' : 'In stock';
+                } else {
+                    value = 'In stock';
+                }
+            } else {
+                // For text fields (name, price, weight, description, category, discount)
+                const text = await page.locator(selector).first().innerText({ timeout });
+                value = text ? text.trim() : null;
+            }
+            
+            if (value && value !== '') {
+                return { field, value, successfulSelector: selector };
+            }
+        } catch (error) {
+            // Selector failed, try next one
+            continue;
+        }
+    }
+    
+    return { field, value: null, successfulSelector: null };
+}
+
 async function tryExtractWithVendorSelectors(page, vendor, url) {
-	 
     try {
         const all = loadVendorSelectors();
         const vendorData = all[vendor];
         if (!vendorData) return null;
         
-        // Support both old format (direct selectors) and new format (selector arrays)
-        const selectors = vendorData.selectors || vendorData; // New format has 'selectors' key
-        if (!selectors) return null;
+        // Handle backward compatibility with old format
+        let selectors = vendorData.selectors;
+        if (!selectors && Object.keys(vendorData).some(key => key !== 'last_llm_extraction')) {
+            // Convert old format on the fly (don't modify the original data)
+            selectors = {};
+            for (const [field, selector] of Object.entries(vendorData)) {
+                if (field !== 'last_llm_extraction' && typeof selector === 'string') {
+                    selectors[field] = [{ selector, success_count: 1 }];
+                }
+            }
+        }
+        
+        if (!selectors || Object.keys(selectors).length === 0) return null;
         
         const result = { product_url: url };
         
         // Extract all fields in parallel for much better performance
         const extractionPromises = [];
+        const fieldsToExtract = ['name', 'price', 'weight', 'description', 'category', 'discount', 'main_image', 'stock_status'];
         
-        // Helper function to try multiple selectors for a field
-        const tryFieldSelectors = async (field, selectorList) => {
-            if (!selectorList) return { field, value: null, successfulSelector: null };
-            
-            // Handle both old format (string) and new format (array)
-            const selectors = Array.isArray(selectorList) ? selectorList : [{ selector: selectorList, confidence_score: 1.0 }];
-            
-            // Sort by confidence score (highest first)
-            const sortedSelectors = selectors.sort((a, b) => (b.confidence_score || 0) - (a.confidence_score || 0));
-            
-            for (const selectorObj of sortedSelectors) {
-                const selectorString = selectorObj.selector || selectorObj;
-                try {
-                    let value;
-                    if (field === 'main_image') {
-                        value = await page.locator(selectorString).first().getAttribute('src', { timeout: 10000 });
-                        value = value ? cleanAndValidateUrl(value.trim()) : null;
-                    } else if (field === 'stock_status') {
-                        const isVisible = await page.locator(selectorString).first().isVisible({ timeout: 10000 });
-                        if (isVisible) {
-                            const text = await page.locator(selectorString).first().innerText({ timeout: 5000 });
-                            const isOutOfStock = /out of stock|sold out|unavailable|not available/i.test(text);
-                            value = isOutOfStock ? 'Out of stock' : 'In stock';
-                        } else {
-                            value = 'In stock';
-                        }
-                    } else {
-                        value = await page.locator(selectorString).first().innerText({ timeout: 10000 });
-                        value = value ? value.trim() : null;
-                    }
-                    
-                    if (value) {
-                        // Success! Update statistics and return
-                        await updateSelectorStatistics(vendor, field, selectorObj, true);
-                        return { field, value, successfulSelector: selectorObj };
-                    }
-                } catch (error) {
-                    // This selector failed, try the next one
-                    await updateSelectorStatistics(vendor, field, selectorObj, false);
-                    continue;
-                }
-            }
-            
-            return { field, value: null, successfulSelector: null };
-        };
-        
-        // Extract all standard fields using the new multi-selector approach
-        const fieldNames = ['name', 'price', 'weight', 'description', 'category', 'discount', 'main_image', 'stock_status'];
-        
-        for (const field of fieldNames) {
-            const selectorList = selectors[field];
-            if (selectorList) {
-                extractionPromises.push(tryFieldSelectors(field, selectorList));
+        for (const field of fieldsToExtract) {
+            if (selectors[field] && Array.isArray(selectors[field])) {
+                extractionPromises.push(trySelectorsForField(page, field, selectors[field]));
             }
         }
         
@@ -443,24 +477,24 @@ async function tryExtractWithVendorSelectors(page, vendor, url) {
                     extractFunction(page, { url, vendor })
                         .then(vendorResult => {
                             if (vendorResult && vendorResult.images) {
-                                return { field: 'images', value: vendorResult.images };
+                                return { field: 'images', value: vendorResult.images, successfulSelector: null };
                             }
-                            return { field: 'images', value: [] };
+                            return { field: 'images', value: [], successfulSelector: null };
                         })
-                        .catch(() => ({ field: 'images', value: [] }))
+                        .catch(() => ({ field: 'images', value: [], successfulSelector: null }))
                 );
                 
-                // Also extract main_image from vendor strategy if not already extracted by selectors
-                if (!selectors.main_image) {
+                // Also extract main_image from vendor strategy if not already covered by selectors
+                if (!selectors.main_image || !Array.isArray(selectors.main_image) || selectors.main_image.length === 0) {
                     extractionPromises.push(
                         extractFunction(page, { url, vendor })
                             .then(vendorResult => {
                                 if (vendorResult && vendorResult.main_image) {
-                                    return { field: 'main_image', value: vendorResult.main_image };
+                                    return { field: 'main_image', value: vendorResult.main_image, successfulSelector: null };
                                 }
-                                return { field: 'main_image', value: null };
+                                return { field: 'main_image', value: null, successfulSelector: null };
                             })
-                            .catch(() => ({ field: 'main_image', value: null }))
+                            .catch(() => ({ field: 'main_image', value: null, successfulSelector: null }))
                     );
                 }
             }
@@ -469,17 +503,42 @@ async function tryExtractWithVendorSelectors(page, vendor, url) {
         // Wait for all extractions to complete in parallel
         const results = await Promise.all(extractionPromises);
         
-        // Apply results to the result object
-        for (const result of results) {
-            if (result && result.field && result.value !== null) {
-                result[result.field] = result.value;
+        // Track successful selectors for priority updates
+        const successfulSelectors = {};
+        
+        // Apply results to the result object and track successful selectors
+        for (const { field, value, successfulSelector } of results) {
+            if (value !== null && value !== '') {
+                result[field] = value;
+                
+                // Track which selector worked for this field
+                if (successfulSelector) {
+                    successfulSelectors[field] = successfulSelector;
+                }
             }
         }
         
-        return result;
+        // Update success tracking for working selectors (only if needed to reduce I/O)
+        if (Object.keys(successfulSelectors).length > 0) {
+            // Check if any of the successful selectors actually need updates (not already at max count)
+            const vendorData = loadVendorSelectors()[vendor];
+            const needsUpdate = Object.entries(successfulSelectors).some(([field, selector]) => {
+                if (!vendorData || !vendorData.selectors || !Array.isArray(vendorData.selectors[field])) {
+                    return true; // New selector, needs update
+                }
+                const existing = vendorData.selectors[field].find(s => s.selector === selector);
+                return !existing || existing.success_count < 10;
+            });
+            
+            if (needsUpdate) {
+                saveVendorSelectors(vendor, successfulSelectors);
+            }
+        }
+        
+        return Object.keys(result).length > 1 ? result : null; // Return null if only product_url is set
     } catch { 
-	return null;
-}
+        return null;
+    }
 }
  
 
@@ -534,7 +593,7 @@ async function extractGeneric(page, urlObj) {
 	const dynamicFields = [];
 	
 	// Check if we have core fields and if there are any missing fields
-	const hasCore = direct && direct.name && direct.price;
+	const hasCore = hasValidCoreData(direct);
 	const missingFields = [];
 	
 	if (hasCore) {
@@ -632,8 +691,10 @@ async function extractGeneric(page, urlObj) {
 	
 	// Merge extracted data with defaults
 	const normalizedData = { ...extractedDefaults, ...extractedData };
-	const { name, main_image, images, price, stock_status, weight, description, category, discount } = normalizedData;
+	const { name, main_image, price, stock_status, weight, description, category, discount } = normalizedData;
 
+    // temp fix for now - override images with empty array
+    let images = []
 
 	// Normalize and validate image URLs
 	// Handle case where LLM returns element IDs instead of URLs for images array
@@ -724,106 +785,12 @@ async function extractGeneric(page, urlObj) {
 	}
 	
 	// Cache the result for future use (avoid caching if extraction failed or has errors)
-	if (finalResult && finalResult.name && finalResult.price && !process.env.DISABLE_URL_CACHE) {
+	if (hasValidCoreData(finalResult) && !process.env.DISABLE_URL_CACHE) {
 		cacheManager.set('urlResults', cacheKey, finalResult);
 		console.log(`[URL_CACHE] Cached extraction result for ${urlObj.sku || "url"}`);
 	}
 	
 	return finalResult;
-}
-
-// Update selector statistics and confidence scores
-async function updateSelectorStatistics(vendor, field, selectorObj, success) {
-    try {
-        const all = loadVendorSelectors();
-        if (!all[vendor]) return;
-        
-        // Handle both old format (direct selectors) and new format (selector arrays)
-        let selectors;
-        if (all[vendor].selectors && all[vendor].selectors[field]) {
-            // New format: array of selector objects
-            selectors = all[vendor].selectors[field];
-            if (!Array.isArray(selectors)) {
-                console.log(`[SELECTOR-STATS] Warning: ${vendor}.${field} selectors is not an array, converting...`);
-                // Convert single selector to array format
-                const singleSelector = typeof selectors === 'string' ? selectors : selectors.selector;
-                selectors = [{
-                    selector: singleSelector,
-                    type: singleSelector.startsWith('xpath=') ? 'xpath' : 'css',
-                    learned_at: new Date().toISOString(),
-                    success_count: 0,
-                    failure_count: 0,
-                    last_success: null,
-                    last_failure: null,
-                    confidence_score: 1.0
-                }];
-                all[vendor].selectors[field] = selectors;
-            }
-        } else if (all[vendor][field]) {
-            // Old format: direct field with selector string
-            console.log(`[SELECTOR-STATS] Converting old format ${vendor}.${field} to new format`);
-            const oldSelector = all[vendor][field];
-            selectors = [{
-                selector: oldSelector,
-                type: oldSelector.startsWith('xpath=') ? 'xpath' : 'css',
-                learned_at: new Date().toISOString(),
-                success_count: 0,
-                failure_count: 0,
-                last_success: null,
-                last_failure: null,
-                confidence_score: 1.0
-            }];
-            
-            // Migrate to new format
-            if (!all[vendor].selectors) all[vendor].selectors = {};
-            all[vendor].selectors[field] = selectors;
-            delete all[vendor][field]; // Remove old format field
-        } else {
-            // No selectors found for this field
-            return;
-        }
-        
-        const selectorString = selectorObj.selector || selectorObj;
-        const selectorIndex = selectors.findIndex(s => s.selector === selectorString);
-        
-        if (selectorIndex >= 0) {
-            const selector = selectors[selectorIndex];
-            const now = new Date().toISOString();
-            
-            if (success) {
-                selector.success_count = (selector.success_count || 0) + 1;
-                selector.last_success = now;
-                console.log(`[SELECTOR-STATS] ${vendor}.${field} selector success (${selector.success_count} total)`);
-            } else {
-                selector.failure_count = (selector.failure_count || 0) + 1;
-                selector.last_failure = now;
-                console.log(`[SELECTOR-STATS] ${vendor}.${field} selector failed (${selector.failure_count} total failures)`);
-            }
-            
-            // Calculate confidence score (success rate with recency bias)
-            const totalAttempts = selector.success_count + selector.failure_count;
-            const baseConfidence = totalAttempts > 0 ? selector.success_count / totalAttempts : 0.5;
-            
-            // Add recency bias - recent successes get higher confidence
-            const daysSinceLastSuccess = selector.last_success ? 
-                (new Date() - new Date(selector.last_success)) / (1000 * 60 * 60 * 24) : 365;
-            const recencyBonus = Math.max(0, 0.2 - (daysSinceLastSuccess * 0.01)); // Bonus decreases over time
-            
-            selector.confidence_score = Math.min(1.0, baseConfidence + recencyBonus);
-            
-            // Save the updated statistics
-            const p = path.resolve(process.cwd(), 'tools/utils/cache/vendor-selectors.json');
-            fs.writeFileSync(p, JSON.stringify(all, null, 2));
-            
-            // Update cache
-            cacheManager.set('vendorSelectors', null, all);
-            cacheManager.set('vendorSelectorsLastModified', null, Date.now());
-        } else {
-            console.log(`[SELECTOR-STATS] Warning: Selector not found in ${vendor}.${field} array: ${selectorString}`);
-        }
-    } catch (error) {
-        console.log(`[SELECTOR-STATS] Failed to update statistics: ${error.message}`);
-    }
 }
 
 module.exports = { extractGeneric };
