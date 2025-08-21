@@ -245,7 +245,7 @@ class SessionManager {
             apiKey: process.env.BROWSERBASE_API_KEY,
             projectId: process.env.BROWSERBASE_PROJECT_ID,
             waitForCaptchaSolves: true,
-            modelName: 'google/gemini-2.5-pro',
+            modelName: process.env.MODEL_TYPE || 'google/gemini-2.0-flash',
             modelClientOptions: { apiKey: process.env.GOOGLE_API_KEY },
             domSettleTimeoutMs: 3000, // Wait longer for DOM to settle
         };

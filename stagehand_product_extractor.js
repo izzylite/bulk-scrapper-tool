@@ -15,22 +15,15 @@ const outputManager = require('./tools/utils/manager/files/outputManager');
 const SessionManager = require('./tools/utils/manager/sessionManager');
 const cacheManager = require('./tools/utils/cache/cacheManager');
 const { extractGeneric } = require('./tools/strategies/generic');
+const selectorLearning = require('./tools/utils/selectorLearning');
+const { logError, logErrorWithDetails, getLogStats } = require('./tools/utils/logUtil');
 // Load Stagehand in a way that works for both ESM and CJS builds
 async function loadStagehandCtor() {
     const mod = await import('@browserbasehq/stagehand');
     return mod.Stagehand || (mod.default && (mod.default.Stagehand || mod.default));
 }
 
-// Logging utilities
-const LOG_DIR = path.resolve(process.cwd(), 'logs');
-function logError(event, details) {
-    try {
-        if (!fs.existsSync(LOG_DIR)) fs.mkdirSync(LOG_DIR, { recursive: true });
-        const logFile = path.join(LOG_DIR, `${new Date().toISOString().slice(0, 10)}.log`);
-        const entry = { ts: new Date().toISOString(), level: 'error', event, ...(details || {}) };
-        fs.appendFileSync(logFile, JSON.stringify(entry) + '\n', 'utf8');
-    } catch { }
-}
+// Logging utilities are now imported from logUtil.js
 
 // Initialize SessionManager instance
 const sessionManager = new SessionManager();
@@ -441,11 +434,23 @@ async function processBucket(workerSessionManager, objectsSubset) {
         const urlObj = objectsSubset[i];
         const workerId = workerSessionManager.getWorkerId();
         try {
+            // Wait for any active learning task to complete before proceeding
+            if (selectorLearning.isLearningActive()) {
+                await selectorLearning.waitForLearningCompletion();
+            }
 
             const item = await extractWithStagehand(workerSessionManager, urlObj, page);
             workerSessionManager.addItemToBuffer(item);  
             processedCount++;
             console.log(`[SESSION ${workerId}] Successfully extracted product. currentBatchCount ${processedCount}`);
+            
+            // Process any pending selector learning for this vendor (async, non-blocking)
+            try {
+                await selectorLearning.processPendingSelectorLearning(page, urlObj.vendor, item);
+            } catch (learningError) {
+                console.log(`[SESSION ${workerId}] Selector learning failed: ${learningError.message}`);
+                // Don't fail the extraction if learning fails
+            }
         } catch (err) {
             const errMsg = String(err && err.message ? err.message : err || '');
             // Attempt a one-time session re-init if the stagehand/page appears uninitialized/closed/terminated
@@ -461,6 +466,14 @@ async function processBucket(workerSessionManager, objectsSubset) {
                     processedCount++;
                     console.log(`[SESSION ${workerId}] Successfully recovered after session rotation`);
                     console.log(`[SESSION ${workerId}] Successfully extracted product after rotation. currentBatchCount ${processedCount}`);
+                    
+                    // Process any pending selector learning for this vendor (async, non-blocking)
+                    try {
+                        await selectorLearning.processPendingSelectorLearning(page, urlObj.vendor, item);
+                    } catch (learningError) {
+                        console.log(`[SESSION ${workerId}] Selector learning failed after rotation: ${learningError.message}`);
+                        // Don't fail the extraction if learning fails
+                    }
                     continue;
                 } catch (rotateError) {
                     console.log(`[SESSION ${workerId}] Session rotation failed:`, rotateError.message);
@@ -520,6 +533,22 @@ async function main() {
                 console.log(`  ${cacheName}: ${stats.cached ? 'cached' : 'not cached'} (${stats.type})`);
             }
         });
+        
+        // Display selector learning statistics
+        const learningStats = selectorLearning.getLearningStats();
+        console.log('\n🧠 Selector Learning Summary:');
+        console.log(`  Active learning task: ${learningStats.isActive ? 'Yes' : 'No'}`);
+        console.log(`  Vendors with pending fields: ${learningStats.pendingVendors}`);
+        console.log(`  Total pending fields: ${learningStats.totalPendingFields}`);
+        
+        // Display logging statistics
+        const logStats = getLogStats();
+        console.log('\n📄 Logging Summary:');
+        console.log(`  Log file exists: ${logStats.exists ? 'Yes' : 'No'}`);
+        if (logStats.exists) {
+            console.log(`  Log entries: ${logStats.entries}`);
+            console.log(`  Log file size: ${(logStats.size / 1024).toFixed(2)} KB`);
+        }
     }
 }
 

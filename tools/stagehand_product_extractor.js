@@ -7,14 +7,20 @@ process.setMaxListeners(50);
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
-const { extractProductWithStrategy } = require('./strategies');
+const { extractGeneric } = require('./strategies/generic');
 try { require('dotenv').config(); } catch { }
 const { z } = require('zod');
-const { withFileLock, removeUrlsFromProcessingFile, updateErrorsInProcessingFile, findActiveProcessingFile, cleanupProcessingFile, validateProcessingFileStructure } = require('./utils/pendingManager');
-const inputManager = require('./utils/inputManager');
-const outputManager = require('./utils/outputManager');
-const SessionManager = require('./utils/sessionManager');
-const cacheManager = require('./utils/cacheManager');
+const { withFileLock, 
+    removeUrlsFromProcessingFile, 
+    updateErrorsInProcessingFile, 
+    findActiveProcessingFile, 
+    cleanupProcessingFile, 
+    validateProcessingFileStructure
+ } = require('./utils/manager/files/pendingManager');
+const inputManager = require('./utils/manager/files/inputManager');
+const outputManager = require('./utils/manager/files/outputManager');
+const SessionManager = require('./utils/manager/sessionManager');
+const cacheManager = require('./utils/manager/cacheManager');
 // Load Stagehand in a way that works for both ESM and CJS builds
 async function loadStagehandCtor() {
     const mod = await import('@browserbasehq/stagehand');
@@ -196,7 +202,7 @@ async function extractWithStagehand(workerSessionManager, urlObj, pageOverride) 
     try {
         console.log(`[SESSION ${workerId}] Extracting product...`);
         const start = Date.now();
-        const item = await extractProductWithStrategy(page, urlObj);
+        const item = await extractGeneric(page, urlObj);
         const end = Date.now();
         console.log(`[SESSION ${workerId}] Extracted product in ${end - start}ms`); 
         const blocked = await isBlocked(page, item);
@@ -207,7 +213,7 @@ async function extractWithStagehand(workerSessionManager, urlObj, pageOverride) 
             
             page = await sessionManager.getSafePage(workerSessionManager); // Use default page instead of creating new one
             await navigateWithRetry(page, url, workerId, workerSessionManager);
-            const product2 = await extractProductWithStrategy(page, urlObj);
+            const product2 = await extractGeneric(page, urlObj);
             try { logError('blocked_retry_success', { product_id: product2.product_id, vendor: product2.vendor }); } catch { }
             return { ...product2, retried: true };
         }
@@ -218,7 +224,7 @@ async function extractWithStagehand(workerSessionManager, urlObj, pageOverride) 
             console.log('[RETRY] Missing core fields; retrying with CSS enabled...');
             await sessionManager.configurePagePerformance(workerSessionManager, { blockStyles: false});
             await navigateWithRetry(page, url, workerId, workerSessionManager);
-            const itemCss = await extractProductWithStrategy(page, urlObj);
+            const itemCss = await extractGeneric(page, urlObj);
             return { ...itemCss, retried_css: true };
         }
         return item;
@@ -231,7 +237,7 @@ async function extractWithStagehand(workerSessionManager, urlObj, pageOverride) 
             await workerSessionManager.rotate('extract_error');
             page = await sessionManager.getSafePage(workerSessionManager); // Use default page instead of creating new one
             await navigateWithRetry(page, url, workerId, workerSessionManager);
-            const product3 = await extractProductWithStrategy(page, urlObj);
+            const product3 = await extractGeneric(page, urlObj);
             return { ...product3, retried: true };
         }
         throw err;
@@ -266,11 +272,23 @@ async function appendBatchToOutput(outputPath, meta, batchItems, processingFileP
     const successfulItems = (batchItems || []).filter(item => item && !item.error);
     const errorItems = (batchItems || []).filter(item => item && item.error);
     console.log(`[APPEND] Appending ${successfulItems.length} successful items to output`);
-    // Use outputManager to handle the appending
-    const result = outputManager.appendItemsToOutputFile(outputPath, successfulItems, meta);
     
-    // Handle processing file updates for successful and failed items
+    // Handle all file operations in parallel
     const operations = [];
+    let appendResult = null;
+    
+    // Add output file writing operation
+    if (successfulItems.length > 0) {
+        operations.push(
+            outputManager.appendItemsToOutputFile(outputPath, successfulItems, meta)
+                .then((result) => {
+                    appendResult = result;
+                    const rotationInfo = result.rotated ? ` (rotated to ${path.basename(result.filePath)})` : '';
+                    console.log(`[APPENDED] Written ${result.appended} items to output file (${result.total} total)${rotationInfo}`);
+                    return result;
+                })
+        );
+    }
     
     if (processingFilePath && fs.existsSync(processingFilePath)) {
         // Remove successful URLs from processing file
@@ -278,7 +296,7 @@ async function appendBatchToOutput(outputPath, meta, batchItems, processingFileP
             const successUrls = successfulItems.map(item => item.source_url);
             operations.push(
                 removeUrlsFromProcessingFile(processingFilePath, successUrls)
-                    .then(() => console.log(`[APPENDED] (+${successUrls.length} items successfully extracted and appended to output)`))
+                    .then(() => console.log(`[PROCESSING] Removed ${successUrls.length} successful URLs from processing file`))
             );
         }
 
@@ -286,17 +304,20 @@ async function appendBatchToOutput(outputPath, meta, batchItems, processingFileP
         if (errorItems.length > 0) {
             operations.push(
                 updateErrorsInProcessingFile(processingFilePath, errorItems)
-                    .then(() => console.log(`[ERRORS] ${errorItems.length} URLs failed extraction (errors recorded in processing file)`))
+                    .then(() => console.log(`[ERRORS] Updated ${errorItems.length} URLs with error information in processing file`))
             );
         }
     }
 
     // Wait for all operations to complete in parallel
-    if (operations.length > 0) {
-        await Promise.all(operations);
-    }
+    await Promise.all(operations);
     
-    return result;
+    return { 
+        appended: successfulItems.length, 
+        total: successfulItems.length + errorItems.length,
+        outputFile: appendResult ? appendResult.filePath : outputPath,
+        rotated: appendResult ? appendResult.rotated : false
+    };
 }
 
 async function processScrapperWorkflow(stagehandCtor, batchSize, maxConcurrentBatches = 1, totalLimit = Infinity) {
@@ -359,6 +380,13 @@ async function processScrapperWorkflow(stagehandCtor, batchSize, maxConcurrentBa
             inputFileName
         );
         console.log(`[WORKFLOW] Output will be saved to: ${outputPath}`);
+        
+        // Create metadata for append operations
+        const appendMetadata = {
+            vendor: processingData.vendor,
+            sourceFile: activeProcessingFile.name,
+            inputFileName: inputFileName
+        };
 
         // Step 5: Process items in batches
         const itemsToProcess = processingData.items || [];
@@ -374,7 +402,8 @@ async function processScrapperWorkflow(stagehandCtor, batchSize, maxConcurrentBa
         // Create multiple session managers using SessionManager class
         const sessionManagers = await sessionManager.createMultipleSessionManagers(
             maxConcurrentBatches, 
-            appendBatchToOutput
+            (outputPath, meta, batchItems, processingFilePath) => 
+                appendBatchToOutput(outputPath, { ...meta, ...appendMetadata }, batchItems, processingFilePath)
         );
 
         // Now run the actual workers
