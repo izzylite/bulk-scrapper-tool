@@ -2,6 +2,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { logError, logWarning } = require('../../logUtil');
 
 const PROCESSING_DIR = path.resolve(process.cwd(), 'scrapper/processing');
 
@@ -42,6 +43,7 @@ function getProcessingFiles() {
                     };
                 } catch (err) {
                     console.warn(`[PENDING] Failed to read processing file ${file}:`, err.message);
+                    logWarning('pending_file_read_failed', { file, error: err.message });
                     return null;
                 }
             })
@@ -51,6 +53,7 @@ function getProcessingFiles() {
         return files;
     } catch (err) {
         console.warn('[PENDING] Failed to read processing directory:', err.message);
+        logWarning('pending_directory_read_failed', { error: err.message });
         return [];
     }
 }
@@ -69,6 +72,7 @@ function findActiveProcessingFile() {
     
     if (activeFiles.length > 1) {
         console.warn(`[PENDING] Multiple active processing files found (${activeFiles.length}), using most recent`);
+        logWarning('pending_multiple_active_files', { count: activeFiles.length });
         activeFiles.forEach((file, index) => {
             if (index > 0) {
                 console.log(`[PENDING] Deactivating older file: ${file.name}`);
@@ -92,6 +96,7 @@ function deactivateProcessingFile(filePath) {
         console.log(`[PENDING] Deactivated processing file: ${path.basename(filePath)}`);
     } catch (err) {
         console.warn(`[PENDING] Failed to deactivate processing file ${filePath}:`, err.message);
+        logWarning('pending_deactivate_failed', { filePath, error: err.message });
     }
 }
 
@@ -158,6 +163,7 @@ async function updateErrorsInProcessingFile(processingFilePath, errorItems) {
 			
 			if (!Array.isArray(data?.items)) {
 				console.warn(`[WARNING] Processing file format not recognized, expected { items: [...] }`);
+				logWarning('processing_file_format_unrecognized_update_errors', { expectedFormat: '{ items: [...] }' });
 				return;
 			}
 			
@@ -181,6 +187,7 @@ async function updateErrorsInProcessingFile(processingFilePath, errorItems) {
 			}
 		} catch (err) {
 			console.warn(`[WARNING] Failed to update errors in processing file:`, err.message);
+			logWarning('processing_file_error_update_failed', { error: err.message });
 		}
 	});
 }
@@ -196,6 +203,7 @@ async function removeUrlsFromProcessingFile(processingFilePath, urlsToRemove) {
 			
 			if (!Array.isArray(data?.items)) {
 				console.warn(`[WARNING] Processing file format not recognized, expected { items: [...] }`);
+				logWarning('processing_file_format_unrecognized_remove_urls', { expectedFormat: '{ items: [...] }' });
 				return;
 			}
 			
@@ -233,6 +241,7 @@ async function removeUrlsFromProcessingFile(processingFilePath, urlsToRemove) {
 			}
 		} catch (err) {
 			console.warn(`[WARNING] Failed to batch-remove URLs from processing file:`, err.message);
+			logWarning('processing_file_batch_remove_failed', { error: err.message });
 		}
 	});
 }
@@ -244,6 +253,7 @@ function cleanupProcessingFile(processingFilePath, processingFileName) {
 			
 			if (!Array.isArray(remainingData?.items)) {
 				console.warn(`[WARNING] Processing file format not recognized during cleanup`);
+				logWarning('processing_file_format_unrecognized_cleanup', { message: 'Processing file format not recognized during cleanup' });
 				return;
 			}
 			
@@ -266,6 +276,7 @@ function cleanupProcessingFile(processingFilePath, processingFileName) {
 		}
 	} catch (cleanupError) {
 		console.warn(`[WARNING] Could not check processing file status:`, cleanupError.message);
+		logWarning('processing_file_cleanup_status_check_failed', { error: cleanupError.message });
 	}
 }
 

@@ -169,7 +169,7 @@ async function extractWithStagehand(workerSessionManager, urlObj, pageOverride) 
         // Handle session termination during navigation
         if (err.isTermination) {
             console.log(`[SESSION ${workerId}] Session terminated during navigation, rotating...`);
-            try { logError('navigation_termination', { source_url: url, error: err.message }); } catch { }
+            logError('navigation_termination', { source_url: url, error: err.message });
             if (sessionManager.getShuttingDown()) throw new Error('Shutdown in progress');
             await workerSessionManager.rotate('navigation_terminated');
             
@@ -194,14 +194,14 @@ async function extractWithStagehand(workerSessionManager, urlObj, pageOverride) 
         console.log(`[SESSION ${workerId}] Extracted product in ${end - start}ms`); 
         const blocked = await isBlocked(page, item);
         if (blocked) {
-            try { logError('blocked_detected_after_extract', { product_id: item.product_id, vendor: item.vendor }); } catch { }
+            logError('blocked_detected_after_extract', { product_id: item.product_id, vendor: item.vendor });
             if (sessionManager.getShuttingDown()) throw new Error('Shutdown in progress');
             await workerSessionManager.rotate('blocked_after_extract');
             
             page = await sessionManager.getSafePage(workerSessionManager); // Use default page instead of creating new one
             await navigateWithRetry(page, url, workerId, workerSessionManager);
             const product2 = await extractGeneric(page, urlObj);
-            try { logError('blocked_retry_success', { product_id: product2.product_id, vendor: product2.vendor }); } catch { }
+            logError('blocked_retry_success', { product_id: product2.product_id, vendor: product2.vendor });
             return { ...product2, retried: true };
         }
         // Validate required fields; if missing and CSS is currently blocked, retry once with CSS allowed
@@ -219,7 +219,7 @@ async function extractWithStagehand(workerSessionManager, urlObj, pageOverride) 
         if (err && typeof err === 'object') { try { err.meta = { source_url: url }; } catch { } }
         const msg = String(err && err.message ? err.message : err || '');
         if (/uninitialized|createTarget|closed|Target\.createTarget|terminated|session.*closed|browser.*closed|connection.*closed/i.test(msg)) {
-            try { logError('session_restart_after_error', { source_url: url, error: msg }); } catch { }
+            logError('session_restart_after_error', { source_url: url, error: msg });
             if (sessionManager.getShuttingDown()) throw new Error('Shutdown in progress');
             await workerSessionManager.rotate('extract_error');
             page = await sessionManager.getSafePage(workerSessionManager); // Use default page instead of creating new one
@@ -482,7 +482,7 @@ async function processBucket(workerSessionManager, objectsSubset) {
             }
             console.error('[Extractor] Error for URL:', urlObj.url, '-', errMsg);
             console.log(`[RETRY] URL remains in processing file for future retry: ${urlObj.url}`);
-            try { logError('extract_error', { url: urlObj.url, error: errMsg, ...(err && err.meta ? err.meta : {}) }); } catch { }
+            logError('extract_error', { url: urlObj.url, error: errMsg, ...(err && err.meta ? err.meta : {}) });
             const meta = (err && err.meta) || { product_id: undefined, vendor: undefined, source_url: urlObj.url, extracted_at: new Date().toISOString() };
             const errorItem = { ...meta, error: errMsg };
             workerSessionManager.addItemToBuffer(errorItem);
@@ -509,7 +509,7 @@ async function main() {
         await processScrapperWorkflow(StagehandCtor, batch || 20, concurrentBatches, totalLimit);
     } catch (err) {
         console.error('❌ [Scrapper] Error:', err && err.message ? err.message : err);
-        try { logError('scrapper_error', { error: String(err && err.message ? err.message : err) }); } catch { }
+        logError('scrapper_error', { error: String(err && err.message ? err.message : err) });
         process.exitCode = 1;
     } finally {
         const ms = Date.now() - startTs;

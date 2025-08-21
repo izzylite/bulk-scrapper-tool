@@ -2,6 +2,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { logError, logWarning } = require('../../logUtil');
 
 const OUTPUT_DIR = path.resolve(process.cwd(), 'scrapper/output');
 
@@ -72,6 +73,7 @@ function readExistingOutputFile(filePath) {
         return JSON.parse(rawData);
     } catch (err) {
         console.warn(`[OUTPUT-MANAGER] Failed to read existing output file ${filePath}:`, err.message);
+        logWarning('output_file_read_failed', { filePath, error: err.message });
         return null;
     }
 }
@@ -141,6 +143,7 @@ function findCurrentOutputFile(vendorDir, inputFileName) {
         return outputFiles.length > 0 ? outputFiles[0] : null;
     } catch (err) {
         console.warn(`[OUTPUT-MANAGER] Failed to find current output file:`, err.message);
+        logWarning('output_file_find_failed', { error: err.message });
         return null;
     }
 }
@@ -245,6 +248,7 @@ async function appendItemsToOutputFile(outputFilePath, successfulItems, metadata
             };
         } catch (err) {
             console.error(`[OUTPUT-MANAGER] Failed to write output file:`, err.message);
+            logError('output_file_write_failed', { filePath: targetFilePath, error: err.message });
             throw err;
         }
     });
@@ -279,6 +283,7 @@ function createOutputFile(vendor, sourceFile, inputFileName) {
         return outputFilePath;
     } catch (err) {
         console.error(`[OUTPUT-MANAGER] Failed to create output file:`, err.message);
+        logError('output_file_create_failed', { outputFilePath, error: err.message });
         throw err;
     }
 }
@@ -304,6 +309,7 @@ function getLatestOutputFile(vendor) {
         return files.length > 0 ? files[0].path : null;
     } catch (err) {
         console.warn(`[OUTPUT-MANAGER] Failed to get latest output file for vendor ${vendor}:`, err.message);
+        logWarning('output_latest_file_get_failed', { vendor, error: err.message });
         return null;
     }
 }
@@ -367,6 +373,7 @@ function getVendorSummary(vendor) {
         };
     } catch (err) {
         console.warn(`[OUTPUT-MANAGER] Failed to get vendor summary for ${vendor}:`, err.message);
+        logWarning('output_vendor_summary_failed', { vendor, error: err.message });
         return {
             vendor,
             totalFiles: 0,

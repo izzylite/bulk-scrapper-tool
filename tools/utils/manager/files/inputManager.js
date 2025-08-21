@@ -2,6 +2,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { logError, logWarning } = require('../../logUtil');
 
 const INPUT_DIR = path.resolve(process.cwd(), 'scrapper/input');
 const PROCESSING_DIR = path.resolve(process.cwd(), 'scrapper/processing');
@@ -76,12 +77,14 @@ function readInputFile(filePath) {
         
         if (!validateInputStructure(data)) {
             console.warn(`[INPUT-MANAGER] Invalid structure in file: ${filePath}`);
+            logWarning('input_file_invalid_structure', { filePath });
             return null;
         }
         
         return data;
     } catch (err) {
         console.error(`[INPUT-MANAGER] Failed to read file ${filePath}:`, err.message);
+        logError('input_file_read_failed', { filePath, error: err.message });
         return null;
     }
 }
@@ -177,6 +180,7 @@ function mergeInputFiles(inputFiles) {
             mergedData.vendor = data.vendor;
         } else if (mergedData.vendor !== data.vendor) {
             console.warn(`[INPUT-MANAGER] Vendor mismatch detected: ${mergedData.vendor} vs ${data.vendor}. Using first vendor.`);
+            logWarning('input_vendor_mismatch', { firstVendor: mergedData.vendor, currentVendor: data.vendor });
             return null;
         }
         
@@ -195,6 +199,7 @@ function mergeInputFiles(inputFiles) {
     
     if (validFileCount === 0) {
         console.error('[INPUT-MANAGER] No valid input files found');
+        logError('input_no_valid_files', { validFileCount });
         return null;
     }
     
@@ -255,6 +260,7 @@ function saveToProcessingDirectory(processingData) {
         return filePath;
     } catch (err) {
         console.error(`[INPUT-MANAGER] Failed to save processing file:`, err.message);
+        logError('input_processing_file_save_failed', { filePath, error: err.message });
         throw err;
     }
 }
@@ -281,6 +287,7 @@ function archiveInputFiles(inputFiles) {
             console.log(`[INPUT-MANAGER] Archived: ${fileName} -> archived/${backupFileName}`);
         } catch (err) {
             console.warn(`[INPUT-MANAGER] Failed to archive ${filePath}:`, err.message);
+            logWarning('input_file_archive_failed', { filePath, error: err.message });
         }
     }
 }
