@@ -6,10 +6,16 @@ const fs = require('fs');
 const path = require('path');
 const cacheManager = require('../utils/cache/cacheManager');
 
-// Import vendor-specific strategies
+// Import vendor-specific strategies and their custom fields
 const vendorStrategies = {
     superdrug: require('./superdrug')  // Match the vendor key used in index.js
 };
+
+// Extract custom fields from vendor strategies
+function getVendorCustomFields(vendor) {
+    const strategy = vendorStrategies[vendor];
+    return strategy && strategy.customFields ? strategy.customFields : {};
+}
 
 
 
@@ -266,7 +272,20 @@ async function learnAndCacheSelectors(page, vendor, item) {
     const learned = {};
     // Learn selectors for static fields, main_image, and stock_status (which often has consistent patterns)
     // Truly dynamic fields (images array) will always use LLM
-    const fieldsToLearn = ['name', 'price', 'main_image', 'weight', 'description', 'category', 'discount', 'stock_status'];
+    const baseFieldsToLearn = ['name', 'price', 'main_image', 'weight', 'description', 'category', 'discount', 'stock_status'];
+    
+    // Add custom vendor fields that are suitable for selector learning (non-dynamic fields)
+    const customFieldNames = Object.keys(getVendorCustomFields(vendor));
+    const customFieldsToLearn = customFieldNames.filter(field => {
+        // Only learn selectors for string/boolean fields, not arrays or complex types
+        const fieldDef = getVendorCustomFields(vendor)[field];
+        return fieldDef && fieldDef._def && (
+            fieldDef._def.typeName === 'ZodString' || 
+            fieldDef._def.typeName === 'ZodBoolean'
+        );
+    });
+    
+    const fieldsToLearn = [...baseFieldsToLearn, ...customFieldsToLearn];
     
     // Prepare fields that need learning
     const fieldsToProcess = fieldsToLearn.filter(field => {
@@ -302,7 +321,20 @@ async function learnAndCacheSelectors(page, vendor, item) {
                     return { field, selector: null, method: 'observe' };
                 }
             } else {
-                observePrompt = `Find the specific element on this page that contains the text "${value}". I need to locate this element for data extraction.`;
+                // Check if this is a custom boolean field
+                const customFields = getVendorCustomFields(vendor);
+                const fieldDef = customFields[field];
+                if (fieldDef && fieldDef._def && fieldDef._def.typeName === 'ZodBoolean') {
+                    if (value === 'true' || value === true) {
+                        const fieldDescription = fieldDef._def.description || field.replace(/_/g, ' ');
+                        observePrompt = `Find the element on this page that indicates "${fieldDescription}". Look for relevant text, badges, or indicators.`;
+                    } else {
+                        // Skip learning for false boolean values
+                        return { field, selector: null, method: 'observe' };
+                    }
+                } else {
+                    observePrompt = `Find the specific element on this page that contains the text "${value}". I need to locate this element for data extraction.`;
+                }
             }
             
             const observation = await page.observe(observePrompt, { timeout: 5000 });
@@ -353,10 +385,28 @@ async function learnAndCacheSelectors(page, vendor, item) {
                                 return { field, selector, method: 'observe' };
                             }
                         } else {
-                            // For text fields, validate by checking inner text
-                            const testText = await page.locator(selector).first().innerText({ timeout: 5000 });
-                            if (testText && (testText.includes(value) || value.includes(testText))) {
-                                return { field, selector, method: 'observe' };
+                            // Check if this is a custom boolean field
+                            const customFields = getVendorCustomFields(vendor);
+                            const fieldDef = customFields[field];
+                            if (fieldDef && fieldDef._def && fieldDef._def.typeName === 'ZodBoolean') {
+                                // For boolean custom fields, validate based on selector type
+                                if (selector.includes('input') && selector.includes('hidden')) {
+                                    const inputValue = await page.locator(selector).first().getAttribute('value', { timeout: 5000 });
+                                    if (inputValue === 'true' && (value === 'true' || value === true)) {
+                                        return { field, selector, method: 'observe' };
+                                    }
+                                } else {
+                                    const isVisible = await page.locator(selector).first().isVisible({ timeout: 5000 });
+                                    if (isVisible && (value === 'true' || value === true)) {
+                                        return { field, selector, method: 'observe' };
+                                    }
+                                }
+                            } else {
+                                // For text fields, validate by checking inner text
+                                const testText = await page.locator(selector).first().innerText({ timeout: 5000 });
+                                if (testText && (testText.includes(value) || value.includes(testText))) {
+                                    return { field, selector, method: 'observe' };
+                                }
                             }
                         }
                     } catch (validationError) {
@@ -413,12 +463,29 @@ async function trySelectorsForField(page, field, selectors, timeout = 10000) {
                     value = 'In stock';
                 }
             } else {
-                // For text fields (name, price, weight, description, category, discount)
-                const text = await page.locator(selector).first().innerText({ timeout });
-                value = text ? text.trim() : null;
+                // Check if this is a custom boolean field
+                const customFields = getVendorCustomFields(vendor);
+                const fieldDef = customFields[field];
+                if (fieldDef && fieldDef._def && fieldDef._def.typeName === 'ZodBoolean') {
+                    // Handle boolean custom fields with different selector types
+                    const element = await page.locator(selector).first();
+                    if (selector.includes('input') && selector.includes('hidden')) {
+                        // For hidden input fields, get the value attribute
+                        const inputValue = await element.getAttribute('value', { timeout });
+                        value = inputValue === 'true' || inputValue === true;
+                    } else {
+                        // For other elements, check visibility/existence
+                        const isVisible = await element.isVisible({ timeout });
+                        value = isVisible;
+                    }
+                } else {
+                    // For text fields (name, price, weight, description, category, discount, custom string fields)
+                    const text = await page.locator(selector).first().innerText({ timeout });
+                    value = text ? text.trim() : null;
+                }
             }
             
-            if (value && value !== '') {
+            if (value !== null && value !== '' && value !== undefined) {
                 return { field, value, successfulSelector: selector };
             }
         } catch (error) {
@@ -454,7 +521,20 @@ async function tryExtractWithVendorSelectors(page, vendor, url) {
         
         // Extract all fields in parallel for much better performance
         const extractionPromises = [];
-        const fieldsToExtract = ['name', 'price', 'weight', 'description', 'category', 'discount', 'main_image', 'stock_status'];
+        const baseFieldsToExtract = ['name', 'price', 'weight', 'description', 'category', 'discount', 'main_image', 'stock_status'];
+        
+        // Add custom vendor fields that can be extracted via selectors
+        const customFieldNames = Object.keys(getVendorCustomFields(vendor));
+        const customFieldsToExtract = customFieldNames.filter(field => {
+            // Only extract string/boolean fields via selectors, not arrays or complex types
+            const fieldDef = getVendorCustomFields(vendor)[field];
+            return fieldDef && fieldDef._def && (
+                fieldDef._def.typeName === 'ZodString' || 
+                fieldDef._def.typeName === 'ZodBoolean'
+            );
+        });
+        
+        const fieldsToExtract = [...baseFieldsToExtract, ...customFieldsToExtract];
         
         for (const field of fieldsToExtract) {
             if (selectors[field] && Array.isArray(selectors[field])) {
@@ -462,7 +542,7 @@ async function tryExtractWithVendorSelectors(page, vendor, url) {
             }
         }
         
-        // Extract images using vendor-specific strategy if available
+        // Extract vendor-specific fields using vendor strategy if available
         if (vendorStrategies[vendor]) {
             const strategy = vendorStrategies[vendor];
             // Use the appropriate extraction function based on vendor
@@ -473,30 +553,36 @@ async function tryExtractWithVendorSelectors(page, vendor, url) {
             // Add more vendor-specific extraction functions here as needed
             
             if (extractFunction) {
+                // Extract all vendor-specific data in one call
                 extractionPromises.push(
                     extractFunction(page, { url, vendor })
                         .then(vendorResult => {
-                            if (vendorResult && vendorResult.images) {
-                                return { field: 'images', value: vendorResult.images, successfulSelector: null };
-                            }
-                            return { field: 'images', value: [], successfulSelector: null };
-                        })
-                        .catch(() => ({ field: 'images', value: [], successfulSelector: null }))
-                );
-                
-                // Also extract main_image from vendor strategy if not already covered by selectors
-                if (!selectors.main_image || !Array.isArray(selectors.main_image) || selectors.main_image.length === 0) {
-                    extractionPromises.push(
-                        extractFunction(page, { url, vendor })
-                            .then(vendorResult => {
-                                if (vendorResult && vendorResult.main_image) {
-                                    return { field: 'main_image', value: vendorResult.main_image, successfulSelector: null };
+                            const results = [];
+                            
+                            if (vendorResult) {
+                                // Handle images
+                                if (vendorResult.images) {
+                                    results.push({ field: 'images', value: vendorResult.images, successfulSelector: null });
                                 }
-                                return { field: 'main_image', value: null, successfulSelector: null };
-                            })
-                            .catch(() => ({ field: 'main_image', value: null, successfulSelector: null }))
-                    );
-                }
+                                
+                                // Handle main_image if not already covered by selectors
+                                if (vendorResult.main_image && (!selectors.main_image || !Array.isArray(selectors.main_image) || selectors.main_image.length === 0)) {
+                                    results.push({ field: 'main_image', value: vendorResult.main_image, successfulSelector: null });
+                                }
+                                
+                                // Handle custom vendor fields
+                                const customFieldNames = Object.keys(getVendorCustomFields(vendor));
+                                for (const fieldName of customFieldNames) {
+                                    if (vendorResult[fieldName] !== undefined && vendorResult[fieldName] !== null && vendorResult[fieldName] !== '') {
+                                        results.push({ field: fieldName, value: vendorResult[fieldName], successfulSelector: null });
+                                    }
+                                }
+                            }
+                            
+                            return results;
+                        })
+                        .catch(() => [])
+                );
             }
         }
       
@@ -506,14 +592,31 @@ async function tryExtractWithVendorSelectors(page, vendor, url) {
         // Track successful selectors for priority updates
         const successfulSelectors = {};
         
+        // Flatten results array since vendor extraction can return arrays
+        const flatResults = [];
+        for (const resultItem of results) {
+            if (Array.isArray(resultItem)) {
+                flatResults.push(...resultItem);
+            } else {
+                flatResults.push(resultItem);
+            }
+        }
+        
         // Apply results to the result object and track successful selectors
-        for (const { field, value, successfulSelector } of results) {
-            if (value !== null && value !== '') {
-                result[field] = value;
+        for (const { field, value, successfulSelector } of flatResults) {
+            if (value !== null && value !== '' && value !== undefined) {
+                // For boolean fields, accept false as a valid value
+                const customFields = getVendorCustomFields(vendor);
+                const fieldDef = customFields[field];
+                const isBooleanField = fieldDef && fieldDef._def && fieldDef._def.typeName === 'ZodBoolean';
                 
-                // Track which selector worked for this field
-                if (successfulSelector) {
-                    successfulSelectors[field] = successfulSelector;
+                if (isBooleanField || value !== '') {
+                    result[field] = value;
+                    
+                    // Track which selector worked for this field
+                    if (successfulSelector) {
+                        successfulSelectors[field] = successfulSelector;
+                    }
                 }
             }
         }
@@ -573,7 +676,8 @@ async function extractGeneric(page, urlObj) {
 	const direct =  await tryExtractWithVendorSelectors(page, vendor, url);
 	
 	// Build dynamic schema for only the fields we need from LLM
-	const fieldDefinitions = {
+	// Start with base field definitions
+	const baseFieldDefinitions = {
 		name: z.string().describe('The exact product name shown on the page'),
 		main_image: z.string().url().describe('Direct URL to the primary/hero product image starting with http:// or https:// (return empty string if no valid image URL found)'),
 		images: z.array(z.string()).describe(`Gallery of product images. Array of ALL product image URLs starting with http:// or https://. (return empty string if no valid image URL found)`),
@@ -584,6 +688,10 @@ async function extractGeneric(page, urlObj) {
 		category: z.string().describe('Primary product category or breadcrumb category text shown on the page'),
 		discount: z.string().describe('Displayed discount or promotion text (e.g., 10% off or £5 off) if available'),
 	};
+	
+	// Merge with vendor-specific custom fields
+	const vendorCustomFields = getVendorCustomFields(vendor);
+	const fieldDefinitions = { ...baseFieldDefinitions, ...vendorCustomFields };
 
 	// Derive all fields from fieldDefinitions to eliminate maintenance errors
 	const allFields = Object.keys(fieldDefinitions);
@@ -606,6 +714,7 @@ async function extractGeneric(page, urlObj) {
 		
 		// Check which fields are missing or empty from direct extraction
 		for (const field of allFields) {
+             
 			const value = direct[field];
 			const isMissingFromDirect = !value || (typeof value === 'string' && value.trim() === '');
 			const isDynamicField = dynamicFields.includes(field);
@@ -647,12 +756,30 @@ async function extractGeneric(page, urlObj) {
 
 	// Determine which fields to extract via LLM
 	let fieldsForLLM = Object.keys(fieldDefinitions);
-	let instruction = "Extract the product's name, primary image URL, displayed price, all product image URLs, stock status, pack size/weight, category, any discount information, and a concise description.";
+	
+	// Build dynamic instruction including custom vendor fields
+	const baseInstruction = "Extract the product's name, primary image URL, displayed price, all product image URLs, stock status, pack size/weight, category, any discount information, and a concise description";
+	const vendorCustomFieldNames = Object.keys(getVendorCustomFields(vendor));
+	let instruction = baseInstruction;
+	
+	if (vendorCustomFieldNames.length > 0) {
+		const customDescriptions = vendorCustomFieldNames.map(field => {
+			const fieldDef = fieldDefinitions[field];
+			if (fieldDef && fieldDef._def && fieldDef._def.description) {
+				return fieldDef._def.description.toLowerCase();
+			}
+			return field.replace(/_/g, ' ');
+		});
+		instruction = `${baseInstruction}, and the following vendor-specific information: ${customDescriptions.join(', ')}.`;
+	} else {
+		instruction = `${baseInstruction}.`;
+	}
 	
 	if (hasCore && missingFields.length > 0) {
 		// Only extract missing fields via LLM
 		fieldsForLLM = missingFields.filter(field => fieldDefinitions[field]);
 		const fieldNames = fieldsForLLM.map(field => {
+			// First check base field mappings
 			switch(field) {
 				case 'main_image': return 'primary image URL';
 				case 'images': return 'all product image URLs';
@@ -661,7 +788,15 @@ async function extractGeneric(page, urlObj) {
 				case 'description': return 'description';
 				case 'category': return 'category';
 				case 'discount': return 'discount information';
-				default: return field;
+				default:
+					// For custom vendor fields, try to extract description from Zod schema
+					const fieldDef = fieldDefinitions[field];
+					if (fieldDef && fieldDef._def && fieldDef._def.description) {
+						// Use the Zod description for custom fields
+						return fieldDef._def.description.toLowerCase();
+					}
+					// Fallback to field name with better formatting
+					return field.replace(/_/g, ' ');
 			}
 		});
 		instruction = `Extract only the following product information: ${fieldNames.join(', ')}.`;
@@ -686,12 +821,28 @@ async function extractGeneric(page, urlObj) {
 	// Create defaults based on field definitions to maintain consistency
 	const extractedDefaults = {};
 	for (const field of allFields) {
-		extractedDefaults[field] = field === 'images' ? [] : '';
+		const fieldDef = fieldDefinitions[field];
+		if (fieldDef && fieldDef._def && fieldDef._def.typeName === 'ZodArray') {
+			extractedDefaults[field] = [];
+		} else {
+			extractedDefaults[field] = '';
+		}
 	}
 	
 	// Merge extracted data with defaults
 	const normalizedData = { ...extractedDefaults, ...extractedData };
+	
+	// Extract base fields (backward compatibility)
 	const { name, main_image, price, stock_status, weight, description, category, discount } = normalizedData;
+	
+	// Extract all custom fields dynamically
+	const customFieldData = {};
+	const extractedCustomFieldNames = Object.keys(getVendorCustomFields(vendor));
+	for (const fieldName of extractedCustomFieldNames) {
+		if (normalizedData[fieldName] !== undefined) {
+			customFieldData[fieldName] = normalizedData[fieldName];
+		}
+	}
 
     // temp fix for now - override images with empty array
     let images = []
@@ -722,8 +873,21 @@ async function extractGeneric(page, urlObj) {
 	if (mainImage) imagesList.unshift(mainImage);
 	imagesList = Array.from(new Set(imagesList.filter(Boolean)));
 
-	// Create LLM extracted product data
-	const llmProduct = {product_id: urlObj.sku, name, main_image: mainImage, images: imagesList, price, stock_status, weight, description, category, discount, product_url: url };
+	// Create LLM extracted product data (including custom fields)
+	const llmProduct = {
+		product_id: urlObj.sku, 
+		name, 
+		main_image: mainImage, 
+		images: imagesList, 
+		price, 
+		stock_status, 
+		weight, 
+		description, 
+		category, 
+		discount, 
+		product_url: url,
+		...customFieldData  // Include any custom vendor fields
+	};
 	
 	// Merge direct extraction results with LLM results (prioritize direct when available)
 	let finalProduct = llmProduct;
