@@ -3,6 +3,7 @@
 const fs = require('fs');
 const path = require('path');
 const { logError, logWarning } = require('../../logUtil');
+const { assignVariants } = require('./variantManager');
 
 const INPUT_DIR = path.resolve(process.cwd(), 'scrapper/input');
 const PROCESSING_DIR = path.resolve(process.cwd(), 'scrapper/processing');
@@ -149,6 +150,8 @@ function applyAllExclusions(items, allExclusions, vendor) {
     return filteredItems;
 }
 
+
+
 /**
  * Merges multiple input files into a single dataset
  * @param {Array} inputFiles - Array of file paths
@@ -206,6 +209,8 @@ function mergeInputFiles(inputFiles) {
     // Remove duplicates and apply exclusions
     mergedData.items = removeDuplicates(mergedData.items);
     mergedData.items = applyAllExclusions(mergedData.items, allExclusions, mergedData.vendor);
+    // Assign variants (Superdrug-specific strategy with generic fallback)
+    assignVariants(mergedData.items, mergedData.vendor);
     mergedData.total_count = mergedData.items.length;
     mergedData.exclude = Array.from(allExclusions);
     
@@ -228,7 +233,8 @@ function convertToProcessingFormat(inputData, originalInputFiles = []) {
         url: item.url,
         vendor: inputData.vendor,
         image_url: item.image_url || null,
-        sku: item.sku_id || null
+        sku: item.sku_id || null,
+        variants: Array.isArray(item.variants) ? item.variants : []
     }));
     
     return {

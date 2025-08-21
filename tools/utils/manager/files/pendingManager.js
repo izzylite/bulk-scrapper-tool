@@ -102,7 +102,7 @@ function deactivateProcessingFile(filePath) {
 
 /**
  * Validates processing file structure
- * Expected: {active:true/false, vendor:"", total_count:0, processed_count:0, exclude:[] (optional), source_files:[] (optional), items:[{url, vendor, image_url, sku}]}
+ * Expected: {active:true/false, vendor:"", total_count:0, processed_count:0, exclude:[] (optional), source_files:[] (optional), items:[{url, vendor, image_url, sku, variants}]}
  * @param {Object} data - Processing file data
  * @returns {boolean} True if valid
  */
@@ -125,7 +125,17 @@ function validateProcessingFileStructure(data) {
         if (!item || typeof item !== 'object') return false;
         if (!item.url || typeof item.url !== 'string') return false;
         if (!item.vendor || typeof item.vendor !== 'string') return false;
-        // image_url and sku are optional
+        // image_url, sku, and variants are optional
+        if (item.variants !== undefined && !Array.isArray(item.variants)) return false;
+        
+        // Validate variants structure if present
+        if (Array.isArray(item.variants)) {
+            for (const variant of item.variants) {
+                if (!variant || typeof variant !== 'object') return false;
+                if (!variant.url || typeof variant.url !== 'string') return false;
+                // sku_id and image_url are optional in variants
+            }
+        }
     }
     
     return true;
