@@ -14,13 +14,25 @@ let pendingLearningFields = new Map(); // vendor -> Set of fields needing learni
  * @param {Array<string>} fields - Array of field names that need learning
  */
 function reportFieldsNeedingLearning(vendor, fields) {
-    if (!fields || fields.length === 0) return;
-    
+    if (!fields || fields.length === 0) return false;
+
+    // Get existing vendor fields or create new set
     if (!pendingLearningFields.has(vendor)) {
         pendingLearningFields.set(vendor, new Set());
     }
     
-    console.log(`[SELECTOR_LEARNING] Reported ${fields.length} fields needing learning for ${vendor}: ${fields.join(', ')}`); 
+    const vendorFields = pendingLearningFields.get(vendor);
+    let addedAny = false;
+    
+    // Add new fields to vendor's set
+    for (const field of fields) {
+        if (!vendorFields.has(field)) {
+            vendorFields.add(field);
+            addedAny = true;
+        }
+    }
+    
+    return addedAny;
 }
 
 /**
@@ -49,18 +61,38 @@ async function waitForLearningCompletion() {
 }
 
 /**
- * Get the current pending learning fields for a vendor and clear them
+ * Get the current pending learning fields for a vendor (without clearing them)
  * @param {string} vendor - The vendor name
  * @returns {Array<string>} Array of field names that need learning
  */
-function getAndClearPendingFields(vendor) {
+function getPendingFields(vendor) {
     if (!pendingLearningFields.has(vendor)) {
         return [];
     }
-    
-    const fields = Array.from(pendingLearningFields.get(vendor));
-    pendingLearningFields.set(vendor, new Set());
-    return fields;
+
+    return Array.from(pendingLearningFields.get(vendor));
+}
+
+/**
+ * Clear pending learning fields for a vendor after successful learning
+ * @param {string} vendor - The vendor name
+ * @param {Array<string>} fieldsToRemove - Array of field names to remove (optional, clears all if not provided)
+ */
+function clearPendingFields(vendor, fieldsToRemove = null) {
+    if (!pendingLearningFields.has(vendor)) {
+        return;
+    }
+
+    if (fieldsToRemove === null) {
+        // Clear all fields for this vendor
+        pendingLearningFields.set(vendor, new Set());
+    } else {
+        // Remove specific fields
+        const vendorFields = pendingLearningFields.get(vendor);
+        for (const field of fieldsToRemove) {
+            vendorFields.delete(field);
+        }
+    }
 }
 
 /**
@@ -74,22 +106,28 @@ async function processPendingSelectorLearning(page, vendor, extractedItem) {
     // Check if we already have an active learning task
     if (activeLearningTask) {
         console.log(`[SELECTOR_LEARNING] Learning already in progress, skipping...`);
-        return;
+        return Promise.resolve();
     }
-    
-    // Get pending fields for this vendor
-    const fieldsToLearn = getAndClearPendingFields(vendor);
+
+    // Get pending fields for this vendor (without clearing them yet)
+    const fieldsToLearn = getPendingFields(vendor);
     if (fieldsToLearn.length === 0) {
-        return;
+        return Promise.resolve();
     }
-     
+    console.log(`[SELECTOR_LEARNING] Learning fields: ${fieldsToLearn.join(', ')}`);
     // Create the learning task
     activeLearningTask = executeFieldLearning(page, vendor, extractedItem, fieldsToLearn)
+        .then(() => {
+            // Only clear fields after successful learning
+            console.log(`[SELECTOR_LEARNING] Successfully learned fields for ${vendor}, clearing them from pending`);
+            clearPendingFields(vendor, fieldsToLearn);
+        })
         .catch(error => {
-            // Log learning task failure
+            // Log learning task failure - fields remain pending for retry
             console.log(`[SELECTOR_LEARNING] Learning task failed for ${vendor}: ${error.message}`);
-            logErrorWithDetails('selector_learning_task_failed', error, { 
-                vendor, 
+            console.log(`[SELECTOR_LEARNING] Fields remain pending for retry: ${fieldsToLearn.join(', ')}`);
+            logErrorWithDetails('selector_learning_task_failed', error, {
+                vendor,
                 fieldsToLearn
             });
             throw error; // Re-throw to maintain error handling chain
@@ -97,7 +135,7 @@ async function processPendingSelectorLearning(page, vendor, extractedItem) {
         .finally(() => {
             activeLearningTask = null;
         });
-    
+
     // Don't await here - let it run in background
     return activeLearningTask;
 }
@@ -113,7 +151,7 @@ async function processPendingSelectorLearning(page, vendor, extractedItem) {
 async function executeFieldLearning(page, vendor, extractedItem, fieldsToLearn) {
     // Import the learning functions from generic.js
     const { learnAndCacheSelectors } = require('./selectorLearningCore');
-    
+
     // Filter the extracted item to only include fields we want to learn
     const itemForLearning = {};
     for (const field of fieldsToLearn) {
@@ -121,16 +159,16 @@ async function executeFieldLearning(page, vendor, extractedItem, fieldsToLearn) 
             itemForLearning[field] = extractedItem[field];
         }
     }
-     
+
     if (Object.keys(itemForLearning).length > 0) {
         try {
             await learnAndCacheSelectors(page, vendor, itemForLearning);
-        } catch (error) { 
+        } catch (error) {
             // Log field learning execution failure
             console.log(`[SELECTOR_LEARNING] Field learning execution failed for ${vendor}: ${error.message}`);
-            logErrorWithDetails('selector_learning_execution_failed', error, { 
-                vendor, 
-                fieldsToLearn, 
+            logErrorWithDetails('selector_learning_execution_failed', error, {
+                vendor,
+                fieldsToLearn,
                 itemForLearning: Object.keys(itemForLearning)
             });
             throw error;
@@ -138,8 +176,8 @@ async function executeFieldLearning(page, vendor, extractedItem, fieldsToLearn) 
     } else {
         // Log when no fields have values to learn from
         console.log(`[SELECTOR_LEARNING] No fields with values to learn for ${vendor}`);
-        logError('selector_learning_no_fields_with_values', { 
-            vendor, 
+        logError('selector_learning_no_fields_with_values', {
+            vendor,
             fieldsToLearn,
             extractedItemKeys: Object.keys(extractedItem)
         });
@@ -156,11 +194,11 @@ function getLearningStats() {
         pendingVendors: pendingLearningFields.size,
         totalPendingFields: 0
     };
-    
+
     for (const [vendor, fields] of pendingLearningFields) {
         stats.totalPendingFields += fields.size;
     }
-    
+
     return stats;
 }
 

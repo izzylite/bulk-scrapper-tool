@@ -467,7 +467,7 @@ async function processBucket(workerSessionManager, objectsSubset) {
                 for (let j = 0; j < allUrls.length; j++) {
                     if (sessionManager.getShuttingDown()) break; // Add shutdown check inside variant loop
                     const currentUrl = allUrls[j];
-                    console.log(`[SESSION ${workerId}] Extracting ${currentUrl.isMainProduct ? 'main product' : `variant ${j}/${urlObj.variants.length}`}: ${currentUrl.sku || currentUrl.url}`);
+                    console.log(`[SESSION ${workerId}] Extracting ${currentUrl.isMainProduct ? 'main product' : `variant ${j}/${urlObj.variants.length}`}`);
 
                     const extractedItem = await extractWithStagehand(workerSessionManager, currentUrl, page);
 
@@ -514,8 +514,8 @@ async function processBucket(workerSessionManager, objectsSubset) {
 
         } catch (err) {
 
-             function handleExtractionError(urlObj, errMsg, err, workerSessionManager, processedCount) {
-                console.error('[Extractor] Error for URL:', urlObj.url, '-', errMsg);
+             function handleExtractionError(urlObj, errMsg, err, workerSessionManager, processedCount, isVariant = false) {
+                console.error('[Extractor] Error for ', isVariant ? 'variant' : 'main product', ' URL:', urlObj.url, '-', errMsg);
                 console.log(`[RETRY] URL remains in processing file for future retry: ${urlObj.url}`);
                 logError('extract_error', { url: urlObj.url, error: errMsg, ...(err && err.meta ? err.meta : {}) });
                 const meta = (err && err.meta) || { product_id: undefined, vendor: undefined, source_url: urlObj.url, extracted_at: new Date().toISOString() };
@@ -540,7 +540,7 @@ async function processBucket(workerSessionManager, objectsSubset) {
                     if (Array.isArray(urlObj.variants) && urlObj.variants.length > 0) {
                         console.log(`[SESSION ${workerId}] Retrying main product with ${urlObj.variants.length} variants after rotation...`);
                         if (variantAttempts > 3) {
-                            handleExtractionError(urlObj, errMsg, err, workerSessionManager, processedCount);
+                            handleExtractionError(urlObj, errMsg, err, workerSessionManager, processedCount, true);
                             continue;
                         }
                         else {

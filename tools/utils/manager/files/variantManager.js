@@ -114,19 +114,15 @@ function groupByPathSimilarity(items, threshold = 0.9) {
 }
 
 /**
- * Assigns variants to each item in place. Variants are arrays of {url, sku_id, image_url}
- * Strategy: if vendor is superdrug, use deterministic grouping. Otherwise fallback to similarity.
- * @param {Array} items
- * @param {string} vendor
+ * Groups items into variant groups and returns a deduplicated list of main items with variants.
+ * Strategy: if vendor is specified, use deterministic grouping. Otherwise fallback to similarity.
+ * @param {Array} items - Original items array
+ * @param {string} vendor - Vendor name
+ * @returns {Array} Array of main items, each containing a variants array
  */
 function assignVariants(items, vendor) {
-    if (!Array.isArray(items) || items.length === 0) return;
+    if (!Array.isArray(items) || items.length === 0) return [];
     const vendorLc = (vendor || '').toLowerCase();
-
-    // Initialize variants array on all items
-    for (const item of items) {
-        if (item && !Array.isArray(item.variants)) item.variants = [];
-    }
 
     let groups = [];
     if (vendorLc.includes('superdrug')) {
@@ -139,13 +135,39 @@ function assignVariants(items, vendor) {
         groups = groupByPathSimilarity(items, 0.9);
     }
 
-    // Assign variants to each item in a group (excluding itself)
+    // Create a set to track which items are part of variant groups
+    const groupedUrls = new Set();
+    const mainItems = [];
+
+    // Process variant groups - use first item as main item with variants
     for (const group of groups) {
-        const compact = group.map(g => ({ url: g.url, sku_id: g.sku_id || null, image_url: g.image_url || null }));
-        for (const g of group) {
-            g.variants = compact.filter(v => v.url !== g.url);
+        if (group.length > 1) {
+            const mainItem = { ...group[0] }; // Clone the first item as main
+            const variants = group.slice(1).map(g => ({ 
+                url: g.url, 
+                sku_id: g.sku_id || null, 
+                image_url: g.image_url || null 
+            }));
+            mainItem.variants = variants;
+            mainItems.push(mainItem);
+            
+            // Mark all URLs in this group as processed
+            for (const item of group) {
+                groupedUrls.add(item.url);
+            }
         }
     }
+
+    // Add remaining items that weren't part of any variant group
+    for (const item of items) {
+        if (!groupedUrls.has(item.url)) {
+            const singleItem = { ...item };
+            singleItem.variants = [];
+            mainItems.push(singleItem);
+        }
+    }
+
+    return mainItems;
 }
 
 module.exports = {

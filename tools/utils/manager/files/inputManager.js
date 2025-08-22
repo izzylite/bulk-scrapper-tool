@@ -209,12 +209,12 @@ function mergeInputFiles(inputFiles) {
     // Remove duplicates and apply exclusions
     mergedData.items = removeDuplicates(mergedData.items);
     mergedData.items = applyAllExclusions(mergedData.items, allExclusions, mergedData.vendor);
-    // Assign variants (Superdrug-specific strategy with generic fallback)
-    assignVariants(mergedData.items, mergedData.vendor);
+    // Assign variants and get deduplicated main items 
+    mergedData.items = assignVariants(mergedData.items, mergedData.vendor);
     mergedData.total_count = mergedData.items.length;
     mergedData.exclude = Array.from(allExclusions);
     
-    console.log(`[INPUT-MANAGER] Merged ${validFileCount} files: ${mergedData.items.length} unique items, vendor: ${mergedData.vendor}`);
+    console.log(`[INPUT-MANAGER] Merged ${validFileCount} files: ${mergedData.items.length} unique products, vendor: ${mergedData.vendor}`);
     
     return mergedData;
 }
