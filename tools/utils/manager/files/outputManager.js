@@ -91,6 +91,7 @@ function createBaseOutputStructure(vendor, sourceFile) {
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
         total_items: 0,
+        filtered_invalid_count: 0,
         items: []
     };
 }
@@ -162,7 +163,35 @@ function getNextOutputFileIndex(vendorDir, inputFileName) {
  
 
 /**
- * Appends items to an output file (only successful items) with automatic file rotation
+ * Validates if an item should be kept (not filtered out)
+ * Filters out items that have empty price AND "In stock" status
+ * @param {Object} item - Item to validate
+ * @returns {boolean} True if item should be kept, false if it should be filtered out
+ */
+function isValidProduct(item) {
+    if (!item || typeof item !== 'object') {
+        return false;
+    }
+    
+    const price = item.price;
+    const stockStatus = item.stock_status;
+    
+    // Filter out items that have empty price AND are "In stock"
+    // These items are dead urls or products that are no longer available
+    const hasEmptyPrice = price === '' || price === null || price === undefined;
+    const isInStock = stockStatus === 'In stock';
+    
+    // Return false (filter out) if both conditions are met
+    if (hasEmptyPrice && isInStock) {
+        return false;
+    }
+    
+    // Keep all other items (including items with empty price but different stock status)
+    return true;
+}
+
+/**
+ * Appends items to an output file (only successful items with valid prices) with automatic file rotation
  * @param {string} outputFilePath - Path to output file
  * @param {Array} items - Items to append
  * @param {Object} metadata - Metadata about the source
@@ -171,8 +200,19 @@ function getNextOutputFileIndex(vendorDir, inputFileName) {
 async function appendItemsToOutputFile(outputFilePath, successfulItems, metadata = {}) {
     if (!Array.isArray(successfulItems) || successfulItems.length === 0) {
         console.log('[OUTPUT-MANAGER] No items to append');
-        return { appended: 0, total: 0, filePath: outputFilePath };
+        return { appended: 0, total: 0, filePath: outputFilePath, filtered: 0, totalFiltered: 0 };
     }
+    
+    // Filter items to only include those with valid prices
+    const originalCount = successfulItems.length;
+    const validProducts = successfulItems.filter(isValidProduct);
+    const filteredCount = originalCount - validProducts.length;
+    
+    if (filteredCount > 0) {
+        console.log(`[OUTPUT-MANAGER] Filtered out ${filteredCount} items without valid prices (${validProducts.length}/${originalCount} items remain)`);
+    }
+    
+   
     
     const MAX_ITEMS_PER_FILE = 10000;
     
@@ -196,7 +236,7 @@ async function appendItemsToOutputFile(outputFilePath, successfulItems, metadata
         
         if (currentFile) {
             // Check if adding new items would exceed the limit
-            const wouldExceedLimit = (currentFile.itemCount + successfulItems.length) > MAX_ITEMS_PER_FILE;
+            const wouldExceedLimit = (currentFile.itemCount + validProducts.length) > MAX_ITEMS_PER_FILE;
             
             if (wouldExceedLimit) {
                 // Create new indexed file
@@ -222,14 +262,20 @@ async function appendItemsToOutputFile(outputFilePath, successfulItems, metadata
             );
         }
         
-        // Append successful items
+        // Ensure backward compatibility for existing files
+        if (typeof outputData.filtered_invalid_count === 'undefined') {
+            outputData.filtered_invalid_count = 0;
+        }
+        
+        // Append items with valid prices
         if (!Array.isArray(outputData.items)) {
             outputData.items = [];
         }
-        outputData.items.push(...successfulItems);
+        outputData.items.push(...validProducts);
         
         // Update counters
         outputData.total_items = outputData.items.length;
+        outputData.filtered_invalid_count += filteredCount;
         outputData.updated_at = new Date().toISOString();
         
         // Write output file
@@ -237,14 +283,16 @@ async function appendItemsToOutputFile(outputFilePath, successfulItems, metadata
             fs.writeFileSync(targetFilePath, JSON.stringify(outputData, null, 2), 'utf8');
             
             const indexSuffix = targetIndex !== null && targetIndex > 0 ? `_${targetIndex}` : '';
-            console.log(`[OUTPUT-MANAGER] Appended ${successfulItems.length} successful items to ${path.basename(targetFilePath)} (${outputData.total_items} total)`);
+            console.log(`[OUTPUT-MANAGER] Appended ${validProducts.length} items with valid prices to ${path.basename(targetFilePath)} (${outputData.total_items} total)${filteredCount > 0 ? ` [${filteredCount} items filtered out, ${outputData.filtered_invalid_count} total filtered out]` : ''}`);
             
             return {
-                appended: successfulItems.length,
+                appended: validProducts.length,
                 total: outputData.total_items,
                 filePath: targetFilePath,
                 index: targetIndex,
-                rotated: targetFilePath !== outputFilePath
+                rotated: targetFilePath !== outputFilePath,
+                filtered: filteredCount,
+                totalFiltered: outputData.filtered_invalid_count
             };
         } catch (err) {
             console.error(`[OUTPUT-MANAGER] Failed to write output file:`, err.message);
@@ -393,5 +441,6 @@ module.exports = {
     generateOutputFileName,
     findCurrentOutputFile,
     getNextOutputFileIndex,
+    hasValidPrice: isValidProduct,
     OUTPUT_DIR
 };

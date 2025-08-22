@@ -58,8 +58,8 @@ function validateInputStructure(data) {
     for (const item of data.items) {
         if (!item || typeof item !== 'object') return false;
         if (!item.url || typeof item.url !== 'string') return false;
-        // sku_id and image_url are optional but should be strings if present
-        if (item.sku_id && typeof item.sku_id !== 'string') return false;
+        if (!item.sku_id || typeof item.sku_id !== 'string') return false;
+        // image_url is optional but should be strings if present 
         if (item.image_url && typeof item.image_url !== 'string') return false;
     }
     
@@ -314,7 +314,7 @@ function processInputDirectory() {
     // Merge all input files
     const mergedData = mergeInputFiles(inputFiles);
     if (!mergedData) {
-        throw new Error('[INPUT-MANAGER] Failed to merge input files - no valid data found or vendor mismatch');
+        throw new Error('[INPUT-MANAGER] Failed to merge input files - no valid data found or vendor mismatch. File must contain the following fields: exclude:["category to exclude"], total_count:0, vendor:"Required", items: [{url:"Required", sku_id:"Required", image_url:"Optional"}]');
     }
     
     // Convert to processing format

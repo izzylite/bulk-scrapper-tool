@@ -114,27 +114,28 @@ async function saveVendorSelectors(vendor, partial) {
                 }
                 
                 // If we have enough selectors, remove one to make room for the new one
-                if (current.selectors[field].length >= 3) {
+                if (current.selectors[field].length >= 5) {
                     // Remove the oldest selector (last in array) to make room
                     const removed = current.selectors[field].pop();
                     console.log(`[SELECTOR_LEARNING] Removed oldest selector for ${field} to make room for new one: ${removed.selector.substring(0, 50)}...`);
-                } else if (current.selectors[field].length > 0) {
-                    // If we have selectors with high success count (8+), remove the one with lowest success count
-                    const hasHighSuccessSelector = current.selectors[field].some(s => s.success_count >= 8);
-                    if (hasHighSuccessSelector) {
-                        // Find selector with lowest success count
-                        let lowestIndex = 0;
-                        let lowestCount = current.selectors[field][0].success_count;
-                        for (let i = 1; i < current.selectors[field].length; i++) {
-                            if (current.selectors[field][i].success_count < lowestCount) {
-                                lowestCount = current.selectors[field][i].success_count;
-                                lowestIndex = i;
-                            }
-                        }
-                        const removed = current.selectors[field].splice(lowestIndex, 1)[0];
-                        console.log(`[SELECTOR_LEARNING] Removed low-success selector for ${field} (count: ${removed.success_count}) to make room for new one`);
-                    }
-                }
+                } 
+                // else if (current.selectors[field].length > 0) {
+                //     // If we have selectors with high success count (8+), remove the one with lowest success count
+                //     const hasHighSuccessSelector = current.selectors[field].some(s => s.success_count >= 8);
+                //     if (hasHighSuccessSelector) {
+                //         // Find selector with lowest success count
+                //         let lowestIndex = 0;
+                //         let lowestCount = current.selectors[field][0].success_count;
+                //         for (let i = 1; i < current.selectors[field].length; i++) {
+                //             if (current.selectors[field][i].success_count < lowestCount) {
+                //                 lowestCount = current.selectors[field][i].success_count;
+                //                 lowestIndex = i;
+                //             }
+                //         }
+                //         const removed = current.selectors[field].splice(lowestIndex, 1)[0];
+                //         console.log(`[SELECTOR_LEARNING] Removed low-success selector for ${field} (count: ${removed.success_count}) to make room for new one`);
+                //     }
+                // }
                 
                 // Check if this selector already exists in the history
                 const existingIndex = current.selectors[field].findIndex(s => s.selector === selector);

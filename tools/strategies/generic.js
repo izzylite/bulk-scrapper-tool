@@ -310,41 +310,60 @@ async function tryExtractWithVendorSelectors(page, vendor, url, urlObj) {
 			// Add more vendor-specific extraction functions here as needed
 
 			if (extractFunction) {
+				// First try to get product name from learned selectors or extract it directly
+				const getProductNameForVendor = async () => {
+					// Try to get name from learned selectors first
+					if (selectors && selectors.name && Array.isArray(selectors.name)) {
+						const nameResult = await trySelectorsForField(page, 'name', selectors.name, vendor, 5000);
+						if (nameResult && nameResult.value) {
+							return nameResult.value;
+						}
+					} 
+					return null;
+				};
+
 				// Extract all vendor-specific data in one call
 				extractionPromises.push(
-					extractFunction(page, urlObj)
-						.then(vendorResult => {
-							// console.log(`[VENDOR_STRATEGY] Vendor result:`, vendorResult);
-							const results = [];
+					getProductNameForVendor().then(productName =>
+						extractFunction(page, urlObj, productName)
+							.then(vendorResult => {
+								// console.log(`[VENDOR_STRATEGY] Vendor result:`, vendorResult);
+								const results = [];
 
-							if (vendorResult) {
-								// Handle images
-								if (vendorResult.images) {
-									results.push({ field: 'images', value: vendorResult.images, successfulSelector: null });
-								}
-
-								// Handle main_image if not already covered by selectors
-								if (vendorResult.main_image && (!selectors || !selectors.main_image || !Array.isArray(selectors.main_image) || selectors.main_image.length === 0)) {
-									results.push({ field: 'main_image', value: vendorResult.main_image, successfulSelector: null });
-								}
-
-								// Handle custom vendor fields
-								const customFieldNames = Object.keys(getVendorCustomFields(vendor));
-								for (const fieldName of customFieldNames) {
-									if (vendorResult[fieldName] !== undefined && vendorResult[fieldName] !== null && vendorResult[fieldName] !== '') {
-										results.push({ field: fieldName, value: vendorResult[fieldName], successfulSelector: null });
+								if (vendorResult) {
+									// Handle name if extracted by vendor strategy
+									if (vendorResult.name) {
+										results.push({ field: 'name', value: vendorResult.name, successfulSelector: null });
 									}
-								}
-							} else {
-								console.log(`[VENDOR_STRATEGY] Vendor strategy returned null/empty result`);
-							}
 
-							return results;
-						})
-						.catch(error => {
-							console.error(`[VENDOR_STRATEGY] Vendor strategy error:`, error);
-							return [];
-						})
+									// Handle images
+									if (vendorResult.images) {
+										results.push({ field: 'images', value: vendorResult.images, successfulSelector: null });
+									}
+
+									// Handle main_image if not already covered by selectors
+									if (vendorResult.main_image && (!selectors || !selectors.main_image || !Array.isArray(selectors.main_image) || selectors.main_image.length === 0)) {
+										results.push({ field: 'main_image', value: vendorResult.main_image, successfulSelector: null });
+									}
+
+									// Handle custom vendor fields
+									const customFieldNames = Object.keys(getVendorCustomFields(vendor));
+									for (const fieldName of customFieldNames) {
+										if (vendorResult[fieldName] !== undefined && vendorResult[fieldName] !== null && vendorResult[fieldName] !== '') {
+											results.push({ field: fieldName, value: vendorResult[fieldName], successfulSelector: null });
+										}
+									}
+								} else {
+									console.log(`[VENDOR_STRATEGY] Vendor strategy returned null/empty result`);
+								}
+
+								return results;
+							})
+							.catch(error => {
+								console.error(`[VENDOR_STRATEGY] Vendor strategy error:`, error);
+								return [];
+							})
+					)
 				);
 			} else {
 				console.log(`[VENDOR_STRATEGY] No extraction function found for ${vendor}`);
@@ -421,7 +440,7 @@ async function extractGeneric(page, urlObj) {
 	// Generate metadata for this extraction
 	const hash = crypto.createHash('sha1').update(`${vendor}|${url}`).digest('hex');
 	const uuid = `${vendor}_${hash}`;
-	const metadata = { uuid, vendor, source_url: url, extracted_at: new Date().toISOString() };
+	const metadata = { uuid, vendor, source_url: url, product_id: urlObj.sku, extracted_at: new Date().toISOString() };
 
 	// Check URL result cache first (skip for dynamic fields that change frequently)
 	const cacheKey = `${vendor}:${url}`;
@@ -630,8 +649,7 @@ async function extractGeneric(page, urlObj) {
 	imagesList = Array.from(new Set(imagesList.filter(Boolean)));
 
 	// Create LLM extracted product data (including custom fields)
-	const llmProduct = {
-		product_id: urlObj.sku,
+	const llmProduct = { 
 		name,
 		main_image: mainImage,
 		images: imagesList,

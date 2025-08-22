@@ -5,6 +5,7 @@ const path = require('path');
 const { logError, logWarning } = require('../../logUtil');
 
 const PROCESSING_DIR = path.resolve(process.cwd(), 'scrapper/processing');
+const ARCHIVED_DIR = path.join(PROCESSING_DIR, 'archived');
 
 /**
  * Ensures that the processing directory exists
@@ -228,6 +229,9 @@ async function removeUrlsFromProcessingFile(processingFilePath, urlsToRemove) {
 				data.processed_count = data.total_count || 0;
 				fs.writeFileSync(processingFilePath, JSON.stringify(data, null, 2), 'utf8');
 				console.log(`[COMPLETE] Processing file completed and deactivated - all URLs processed`);
+				
+				// Archive the completed processing file (outside the lock)
+				setImmediate(() => archiveProcessingFile(processingFilePath));
 				return;
 			}
 			
@@ -256,6 +260,38 @@ async function removeUrlsFromProcessingFile(processingFilePath, urlsToRemove) {
 	});
 }
 
+/**
+ * Archives a completed processing file to the archived subdirectory
+ * @param {string} processingFilePath - Path to the completed processing file
+ */
+function archiveProcessingFile(processingFilePath) {
+	try {
+		if (!fs.existsSync(processingFilePath)) {
+			console.warn(`[ARCHIVE] Processing file not found for archiving: ${processingFilePath}`);
+			return;
+		}
+		
+		// Ensure archived directory exists
+		if (!fs.existsSync(ARCHIVED_DIR)) {
+			fs.mkdirSync(ARCHIVED_DIR, { recursive: true });
+			console.log(`[ARCHIVE] Created archived directory: ${ARCHIVED_DIR}`);
+		}
+		
+		const fileName = path.basename(processingFilePath);
+		const timestamp = new Date().toISOString().slice(0, 10);
+		const archivedFileName = `${timestamp}_${fileName}`;
+		const archivedPath = path.join(ARCHIVED_DIR, archivedFileName);
+		
+		// Move the file to archived directory
+		fs.renameSync(processingFilePath, archivedPath);
+		console.log(`[ARCHIVE] Archived completed processing file: ${fileName} -> archived/${archivedFileName}`);
+		
+	} catch (err) {
+		console.warn(`[ARCHIVE] Failed to archive processing file ${processingFilePath}:`, err.message);
+		logWarning('processing_file_archive_failed', { filePath: processingFilePath, error: err.message });
+	}
+}
+
 function cleanupProcessingFile(processingFilePath, processingFileName) {
 	try {
 		if (fs.existsSync(processingFilePath)) {
@@ -274,6 +310,9 @@ function cleanupProcessingFile(processingFilePath, processingFileName) {
 				remainingData.active = false;
 				fs.writeFileSync(processingFilePath, JSON.stringify(remainingData, null, 2), 'utf8');
 				console.log(`[CLEANUP] Processing file completed and deactivated`);
+				
+				// Archive the completed processing file
+				archiveProcessingFile(processingFilePath);
 			} else {
 				if (typeof remainingData.total_count === 'number' && typeof remainingData.processed_count === 'number') {
 					const progressPercent = ((remainingData.processed_count / remainingData.total_count) * 100).toFixed(1);
@@ -295,11 +334,13 @@ module.exports = {
 	removeUrlsFromProcessingFile,
 	updateErrorsInProcessingFile,
 	cleanupProcessingFile,
+	archiveProcessingFile,
 	// New processing directory functions
 	ensureProcessingDirectoryExists,
 	getProcessingFiles,
 	findActiveProcessingFile,
 	deactivateProcessingFile,
 	validateProcessingFileStructure,
-	PROCESSING_DIR
+	PROCESSING_DIR,
+	ARCHIVED_DIR
 };

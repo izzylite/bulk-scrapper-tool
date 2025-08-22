@@ -12,6 +12,8 @@ const SUPERDRUG_CUSTOM_FIELDS = {
     marketplace: z.boolean().describe('Marketplace information where the product is sold (e.g., "Sold and shipped by a Marketplace seller")'),
 };
 
+
+
 /**
  * Extract main product image using Superdrug-specific selectors
  */
@@ -19,30 +21,8 @@ function extractMainImage() {
     const imageElement = document.querySelector('e2core-media[format="zoom"] img');
     return imageElement ? (imageElement.src || imageElement.getAttribute('src')) : null;
 }
-
-/**
- * Extract product image gallery using Superdrug-specific selectors
- * @param {string} mainImage - The main image URL to exclude from additional images
- */
-function extractImageGallery(mainImage) {
-    const additionalImages = [];
-    const allImageElements = document.querySelectorAll('e2core-media[format="zoom"] img');
-    
-    allImageElements.forEach((img) => {
-        const imgSrc = img.src || img.getAttribute('src');
-        if (imgSrc && imgSrc !== mainImage) {
-            additionalImages.push(imgSrc);
-        }
-    });
-    
-    // Ensure list includes mainImage and contains only valid, unique URLs
-    const allImages = [];
-    if (mainImage) allImages.push(mainImage);
-    allImages.push(...additionalImages);
-    
-    return Array.from(new Set(allImages.filter(Boolean)));
-}
-
+ 
+ 
 /**
  * Extract marketplace information using Superdrug-specific selectors
  * Based on SKU pattern and actual DOM structure
@@ -114,7 +94,7 @@ function extractCustomFields(urlObj) {
     };
 }
 
-async function extractSuperdrugProduct(page, urlObj) {
+async function extractSuperdrugProduct(page, urlObj, productName = null) {
     try {
         // Wait for image elements to load
         await page.waitForSelector('e2core-media[format="zoom"] img', { 
@@ -123,11 +103,38 @@ async function extractSuperdrugProduct(page, urlObj) {
         });
         
         // Extract image information and custom Superdrug fields using direct selectors
-        const extractedData = await page.evaluate((urlObj) => {
+        const extractedData = await page.evaluate((payload) => {
+            const {urlObj, productName} = payload;
             // Define extraction functions inside the browser context
+            // Note: productName is passed from generic.js
+            
             function extractMainImage() {
                 const imageElement = document.querySelector('e2core-media[format="zoom"] img');
                 return imageElement ? (imageElement.src || imageElement.getAttribute('src')) : null;
+            }
+            
+            function extractImagesByAlt(productName) {
+                if (!productName || typeof productName !== 'string') {
+                    return [];
+                }
+                
+                const images = [];
+                const cleanProductName = productName.trim().toLowerCase();
+                
+                // Find all img elements on the page
+                const allImages = document.querySelectorAll('img[alt]');
+                
+                allImages.forEach((img) => {
+                    const altText = (img.alt || '').trim().toLowerCase();
+                    const imgSrc = img.src || img.getAttribute('src');
+                    
+                    // Check if alt text equals the product name 
+                    if (altText && imgSrc && altText.toLowerCase() === cleanProductName) {
+                        images.push(imgSrc);
+                    }
+                });
+                
+                return Array.from(new Set(images.filter(Boolean)));
             }
             
             function extractImageGallery(mainImage) {
@@ -145,6 +152,34 @@ async function extractSuperdrugProduct(page, urlObj) {
                 const allImages = [];
                 if (mainImage) allImages.push(mainImage);
                 allImages.push(...additionalImages);
+                
+                return Array.from(new Set(allImages.filter(Boolean)));
+            }
+            
+            function extractComprehensiveImageGallery(mainImage, productName) {
+                // Approach 1: Use existing selector-based method
+                const selectorImages = extractImageGallery(mainImage);
+                
+                // Initialize with selector-based images
+                const allImages = [];
+               
+                
+                // Add images from selector-based approach
+                selectorImages.forEach(img => {
+                    if (img && img !== mainImage) {
+                        allImages.push(img);
+                    }
+                });
+                
+                // Approach 2: Use alt attribute matching only if selector approach found less than 2 images
+                if (selectorImages.length == 0) {
+                    const altImages = extractImagesByAlt(productName);
+                    altImages.forEach(img => {
+                        if (img && !allImages.includes(img)) {
+                            allImages.push(img);
+                        }
+                    });
+                }
                 
                 return Array.from(new Set(allImages.filter(Boolean)));
             }
@@ -210,24 +245,35 @@ async function extractSuperdrugProduct(page, urlObj) {
             
             // Execute extraction
             const mainImage = extractMainImage();
-            const uniqueImages = extractImageGallery(mainImage);
+            const uniqueImages = extractComprehensiveImageGallery(mainImage, productName);
             const customFields = extractCustomFields(urlObj);
             
-            return {
+            const result = {
                 main_image: mainImage,
                 images: uniqueImages,
                 ...customFields,
                 metadata: {
-                    extraction_method: 'direct_selectors_with_custom_fields',
+                    extraction_method: 'direct_selectors_with_custom_fields_and_alt_matching',
                     selectors_used: {
-                        images: 'e2core-media[format="zoom"] img',
+                        name: 'passed_from_generic_js',
+                        images: 'e2core-media[format="zoom"] img + alt attribute matching',
                         custom_fields: 'sku_based_and_dom_selectors'
                     },
                     images_found: uniqueImages.length,
-                    custom_fields_found: Object.keys(customFields).filter(key => customFields[key] !== undefined && customFields[key] !== null).length
+                    alt_based_images: productName ? extractImagesByAlt(productName).length : 0,
+                    selector_based_images: extractImageGallery(mainImage).length,
+                    custom_fields_found: Object.keys(customFields).filter(key => customFields[key] !== undefined && customFields[key] !== null).length,
+                    product_name_provided: !!productName
                 }
             };
-        }, urlObj);
+            
+            // Include name if provided
+            if (productName) {
+                result.name = productName;
+            }
+            
+            return result;
+        }, {urlObj, productName});
         
         return extractedData;
         
@@ -241,8 +287,7 @@ module.exports = {
     extractSuperdrugProduct,
     customFields: SUPERDRUG_CUSTOM_FIELDS,
     // Export extraction functions for testing/reuse
-    extractMainImage,
-    extractImageGallery,
+    extractMainImage, 
     extractMarketplaceInfo,
     extractCustomFields
 };

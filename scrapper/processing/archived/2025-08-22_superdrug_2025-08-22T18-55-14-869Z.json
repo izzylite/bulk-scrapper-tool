@@ -1,0 +1,11 @@
+{
+  "active": false,
+  "vendor": "superdrug",
+  "total_count": 1448,
+  "processed_count": 1448,
+  "exclude": [],
+  "source_files": [
+    "marketplace_combined-urls.output.json"
+  ],
+  "items": []
+}
