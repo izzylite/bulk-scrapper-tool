@@ -6,6 +6,7 @@ const fs = require('fs');
 const path = require('path');
 const cacheManager = require('../utils/cache/cacheManager');
 const selectorLearning = require('../utils/selectorLearning');
+const { parsePrice, cleanText, applyDynamicMarkup } = require('../utils/mark_up_price');
 
 // Per-file write lock to safely update vendor-selectors.json from concurrent workers
 const __fileLocks = new Map();
@@ -23,6 +24,38 @@ const vendorStrategies = {
 
 // Import core functions from selector learning module
 const { getVendorCustomFields, loadVendorSelectors, saveVendorSelectors } = require('../utils/selectorLearningCore');
+
+
+
+// Helper function to apply text cleaning and price markup
+function processProductData(productData) {
+	const processed = { ...productData };
+	
+	// Apply cleanText to string fields
+	const textFields = ['name', 'description', 'category', 'weight', 'stock_status'];
+	for (const field of textFields) {
+		if (processed[field] && typeof processed[field] === 'string') {
+			processed[field] = cleanText(processed[field]);
+		}
+	}
+	
+	// Apply dynamic markup to price
+	if (processed.price && typeof processed.price === 'string') {
+		const numericPrice = parsePrice(processed.price);
+		if (numericPrice && numericPrice > 0) {
+			const markedUpPrice = applyDynamicMarkup(numericPrice);
+			// Keep the original currency format but update the price
+			const currencyMatch = processed.price.match(/[£$€¥₹]/);
+			const currency = currencyMatch ? currencyMatch[0] : '';
+			processed.price = `${currency}${markedUpPrice.toFixed(2)}`;
+			
+			// Store original price for reference
+			processed.original_price = numericPrice.toFixed(2);
+		}
+	}
+	
+	return processed;
+}
 
 
 
@@ -230,7 +263,7 @@ async function trySelectorsForField(page, field, selectors, vendor, timeout = 15
 							value = isVisible;
 						}
 					} else {
-						// For text fields (name, price, weight, description, category, discount, custom string fields)
+						// For text fields (name, price, weight, description, category, custom string fields)
 						const text = await page.locator(selectorOption).first().innerText({ timeout: Math.min(timeout, 5000) });
 						value = text ? text.trim() : null;
 					}
@@ -254,13 +287,13 @@ async function trySelectorsForField(page, field, selectors, vendor, timeout = 15
 	return { field, value: null, successfulSelector: null };
 }
 
-async function tryExtractWithVendorSelectors(page, vendor, url, urlObj) {
+async function tryExtractWithVendorSelectors(page, vendor, urlObj) {
 	try {
 		const all = loadVendorSelectors();
 		const vendorData = all[vendor];
 
 		// Initialize result object
-		const result = { product_url: url };
+		const result = {};
 
 		// Handle learned selectors (if any exist)
 		let selectors = null;
@@ -275,7 +308,7 @@ async function tryExtractWithVendorSelectors(page, vendor, url, urlObj) {
 		if (selectors && Object.keys(selectors).length > 0) {
 			console.log(`[VENDOR_STRATEGY] Found ${Object.keys(selectors).length} learned selectors`);
 
-			const baseFieldsToExtract = ['name', 'price', 'weight', 'description', 'category', 'discount', 'main_image', 'stock_status'];
+			const baseFieldsToExtract = ['name', 'price', 'weight', 'description', 'category', 'main_image', 'stock_status'];
 
 			// Add custom vendor fields that can be extracted via selectors
 			const customFieldNames = Object.keys(getVendorCustomFields(vendor));
@@ -424,7 +457,7 @@ async function tryExtractWithVendorSelectors(page, vendor, url, urlObj) {
 			}
 		}
 
-		return Object.keys(result).length > 1 ? result : null; // Return null if only product_url is set
+		return Object.keys(result).length > 0 ? result : null; // Return null if no fields are set
 
 	} catch (error) {
 		console.error(`[VENDOR_STRATEGY] Error in tryExtractWithVendorSelectors:`, error);
@@ -438,16 +471,15 @@ async function extractGeneric(page, urlObj) {
 	const vendor = urlObj.vendor || 'vendor'; // Use vendor from urlObj, fallback to 'vendor'
 
 	// Generate metadata for this extraction
-	const hash = crypto.createHash('sha1').update(`${vendor}|${url}`).digest('hex');
-	const uuid = `${vendor}_${hash}`;
-	const metadata = { uuid, vendor, source_url: url, product_id: urlObj.sku, extracted_at: new Date().toISOString() };
+ 
+	const metadata = { vendor, url, product_id: urlObj.sku, timestamp: new Date().toISOString() };
 
 	// Check URL result cache first (skip for dynamic fields that change frequently)
 	const cacheKey = `${vendor}:${url}`;
 	const cachedResult = cacheManager.get('urlResults', cacheKey);
 	if (cachedResult && !process.env.DISABLE_URL_CACHE) {
 		console.log(`[URL_CACHE] Using cached result for ${url}`);
-		return { ...cachedResult };
+		return processProductData({ ...cachedResult });
 	}
 
 	// First try direct selector extraction (no LLM) if available
@@ -464,7 +496,7 @@ async function extractGeneric(page, urlObj) {
 		weight: z.string().describe('Pack size/weight/volume text if available, e.g., 500g or 2x100ml'),
 		description: z.string().describe('Primary product description or details shown on the page'),
 		category: z.string().describe('Primary product category or breadcrumb category text shown on the page'),
-		discount: z.string().describe('Displayed discount or promotion text (e.g., 10% off or £5 off) if available'),
+
 	};
 
 	// Merge with vendor-specific custom fields
@@ -522,7 +554,7 @@ async function extractGeneric(page, urlObj) {
 	if (missingFields.length === 0 && direct && Object.keys(direct).length > 1) {
 		const result = { ...metadata, ...applyImageFallback(direct, urlObj) };
 		console.log(`[LEARNING] All fields available from direct extraction, using learned selectors only`);
-		return result;
+		return processProductData(result);
 	}
 
 	// Log what we're extracting
@@ -539,7 +571,7 @@ async function extractGeneric(page, urlObj) {
 	let fieldsForLLM = Object.keys(fieldDefinitions);
 
 	// Build dynamic instruction including custom vendor fields
-	const baseInstruction = "Extract the product's name, primary image URL, displayed price, all product image URLs, stock status, pack size/weight, category, any discount information, and a concise description";
+	const baseInstruction = "Extract the product's name, primary image URL, displayed price, all product image URLs, stock status, pack size/weight, category, and a concise description";
 	const vendorCustomFieldNames = Object.keys(getVendorCustomFields(vendor));
 	let instruction = baseInstruction;
 
@@ -570,7 +602,7 @@ async function extractGeneric(page, urlObj) {
 				case 'weight': return 'pack size/weight';
 				case 'description': return 'description';
 				case 'category': return 'category';
-				case 'discount': return 'discount information';
+
 				default:
 					// For custom vendor fields, try to extract description from Zod schema
 					const fieldDef = fieldDefinitions[field];
@@ -617,7 +649,7 @@ async function extractGeneric(page, urlObj) {
 	const normalizedData = { ...extractedDefaults, ...extractedData };
 
 	// Extract base fields
-	const { name, main_image, images, price, stock_status, weight, description, category, discount } = normalizedData;
+	const { name, main_image, images, price, stock_status, weight, description, category } = normalizedData;
 
 	// Extract all custom fields dynamically
 	const customFieldData = {};
@@ -658,8 +690,6 @@ async function extractGeneric(page, urlObj) {
 		weight,
 		description,
 		category,
-		discount,
-		product_url: url,
 		...customFieldData  // Include any custom vendor fields
 	};
 
@@ -673,7 +703,7 @@ async function extractGeneric(page, urlObj) {
 			main_image: direct.main_image || mainImage,
 			// Use direct result for images if available and not empty, otherwise use LLM result
 			images: (direct.images && Array.isArray(direct.images) && direct.images.length > 0) ? direct.images : imagesList,
-			product_url: url // Ensure URL is always set
+			 
 		};
 
 	}
@@ -681,7 +711,10 @@ async function extractGeneric(page, urlObj) {
 	const result = { ...metadata, ...finalProduct };
 
 	// Apply image fallback if urlObj is provided (from sitemap data)
-	const finalResult = applyImageFallback(result, urlObj);
+	let finalResult = applyImageFallback(result, urlObj);
+	
+	// Apply text cleaning and price markup
+	finalResult = processProductData(finalResult);
 
 	// Update extraction snapshot (track what LLM attempted and found)
 	if (fieldsForLLM.length > 0) {
