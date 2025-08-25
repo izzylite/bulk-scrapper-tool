@@ -112,7 +112,7 @@ async function navigateWithRetry(page, targetUrl, workerId, workerSessionManager
     throw lastError;
 }
 
-async function extractWithStagehand(workerSessionManager, urlObj, pageOverride) {
+async function extractWithStagehand(workerSessionManager, urlObj, pageOverride, updateCtx = null) {
     const url = urlObj.url;
     let page = pageOverride || await sessionManager.getSafePage(workerSessionManager);
     const workerId = workerSessionManager.getWorkerId();
@@ -132,7 +132,7 @@ async function extractWithStagehand(workerSessionManager, urlObj, pageOverride) 
     try {
         console.log(`[SESSION ${workerId}] Extracting product...`);
         const start = Date.now();
-        const item = await extractGeneric(page, urlObj);
+        const item = await extractGeneric(page, urlObj, updateCtx);
         const end = Date.now();
         console.log(`[SESSION ${workerId}] Extracted product in ${end - start}ms`);
         const blocked = await isBlocked(page, item);
@@ -142,7 +142,7 @@ async function extractWithStagehand(workerSessionManager, urlObj, pageOverride) 
             await workerSessionManager.rotate('blocked_after_extract');
             page = await sessionManager.getSafePage(workerSessionManager);
             await navigateWithRetry(page, url, workerId, workerSessionManager);
-            const product2 = await extractGeneric(page, urlObj);
+            const product2 = await extractGeneric(page, urlObj, updateCtx);
             logError('blocked_retry_success', { product_id: product2.product_id, vendor: product2.vendor });
             return { ...product2, retried: true };
         }
@@ -152,7 +152,7 @@ async function extractWithStagehand(workerSessionManager, urlObj, pageOverride) 
             console.log('[RETRY] Missing core fields; retrying with CSS enabled...');
             await sessionManager.configurePagePerformance(workerSessionManager, { blockStyles: false });
             await navigateWithRetry(page, url, workerId, workerSessionManager);
-            const itemCss = await extractGeneric(page, urlObj);
+            const itemCss = await extractGeneric(page, urlObj, updateCtx);
             return { ...itemCss, retried_css: true };
         }
         return item;
@@ -165,7 +165,7 @@ async function extractWithStagehand(workerSessionManager, urlObj, pageOverride) 
             await workerSessionManager.rotate('extract_error');
             page = await sessionManager.getSafePage(workerSessionManager);
             await navigateWithRetry(page, url, workerId, workerSessionManager);
-            const product3 = await extractGeneric(page, urlObj);
+            const product3 = await extractGeneric(page, urlObj, updateCtx);
             return { ...product3, retried: true };
         }
         throw err;
@@ -313,6 +313,7 @@ async function processBucket(workerSessionManager, objectsSubset) {
     let processedCount = 0;
     let variantAttempts = 0;
     let page = await sessionManager.getSafePage(workerSessionManager);
+    const updateCtx = (updateManager.getContext && updateManager.getContext()) || null;
     for (let i = 0; i < objectsSubset.length; i++) {
         const urlObj = objectsSubset[i];
         const workerId = workerSessionManager.getWorkerId();
@@ -351,7 +352,7 @@ async function processBucket(workerSessionManager, objectsSubset) {
                     const currentUrl = allUrls[j];
                     console.log(`[SESSION ${workerId}] Extracting ${currentUrl.isMainProduct ? 'main product' : `variant ${j}/${urlObj.variants.length}`}`);
 
-                    const extractedItem = await extractWithStagehand(workerSessionManager, currentUrl, page);
+                    const extractedItem = await extractWithStagehand(workerSessionManager, currentUrl, page, updateCtx);
 
                     if (currentUrl.isMainProduct) {
                         mainProduct = extractedItem;
@@ -377,7 +378,7 @@ async function processBucket(workerSessionManager, objectsSubset) {
                 }
             } else {
                 // No variants, process normally
-                item = await extractWithStagehand(workerSessionManager, urlObj, page);
+                item = await extractWithStagehand(workerSessionManager, urlObj, page, updateCtx);
                 workerSessionManager.addItemToBuffer(item);
                 console.log(`[SESSION ${workerId}] Successfully extracted product (no variants)`);
             }
@@ -427,7 +428,7 @@ async function processBucket(workerSessionManager, objectsSubset) {
                             continue;
                         }
                     } else {
-                        item = await extractWithStagehand(workerSessionManager, urlObj, page);
+                        item = await extractWithStagehand(workerSessionManager, urlObj, page, updateCtx);
                         workerSessionManager.addItemToBuffer({ ...item, retried: true });
                     }
 

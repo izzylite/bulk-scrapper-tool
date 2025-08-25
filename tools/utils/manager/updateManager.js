@@ -2,7 +2,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { findActiveProcessingFile, deactivateProcessingFile } = require('./files/pendingManager');
+const { findActiveProcessingFile, deactivateProcessingFile, getProcessingFiles } = require('./files/pendingManager');
 const inputManager = require('./files/inputManager');
 const outputManager = require('./files/outputManager');
 
@@ -112,16 +112,51 @@ function mergeSnapshots(freshItems, updateKey, updateFields, baseline) {
     return merged;
 }
 
+function findActiveUpdateProcessingForVendor(vendor) {
+    try {
+        const files = getProcessingFiles();
+        for (const f of files) {
+            if (!f.active) continue;
+            if ((f.vendor || '').toLowerCase() !== String(vendor || '').toLowerCase()) continue;
+            // read file to check mode
+            const data = JSON.parse(fs.readFileSync(f.path, 'utf8'));
+            if (data && data.mode === 'update' && data.vendor === vendor) {
+                return { meta: f, data };
+            }
+        }
+    } catch { }
+    return null;
+}
+
 async function prepareUpdateModeIfNeeded(cli) {
     if (!cli || !cli.update) return null;
-    const active = findActiveProcessingFile();
-    if (active?.path) { try { deactivateProcessingFile(active.path); } catch { } }
 
     const vendor = (cli.vendors && cli.vendors[0]) || null;
     if (!vendor) {
         console.log('[UPDATE] --vendor is required for update mode');
         return null;
     }
+
+    // Resume: if there is an active update-mode processing file for this vendor, use it
+    const existing = findActiveUpdateProcessingForVendor(vendor);
+    if (existing && existing.data && Array.isArray(existing.data.items) && existing.data.items.length > 0) {
+        const updKey = existing.data.update_key || cli.updateKey || 'sku';
+        const updFields = Array.isArray(existing.data.update_fields) ? existing.data.update_fields : (Array.isArray(cli.updateFields) ? cli.updateFields : []);
+        console.log(`[UPDATE] Resuming existing update job: ${path.basename(existing.meta.path)} (${existing.data.items.length} remaining)`);
+        // Build/refresh baseline for merging
+        const baseline = buildBaselineForVendor(vendor, updKey);
+        __ctx.enabled = true;
+        __ctx.vendor = vendor;
+        __ctx.updateKey = updKey;
+        __ctx.updateFields = updFields;
+        __ctx.baseline = baseline;
+        return { processingFilePath: existing.meta.path, vendor, itemsCount: existing.data.items.length, baselineSize: baseline.size, resumed: true };
+    }
+
+    // No resume file; deactivate any active processing and create a fresh update job
+    const active = findActiveProcessingFile();
+    if (active?.path) { try { deactivateProcessingFile(active.path); } catch { } }
+
     const cfg = loadVendorUpdateConfig(vendor);
     const updateKey = cli.updateKey || cfg.update_key || null;
     const updateFields = Array.isArray(cli.updateFields) && cli.updateFields.length > 0 ? cli.updateFields : (Array.isArray(cfg.update_fields) ? cfg.update_fields : null);
@@ -156,7 +191,7 @@ async function prepareUpdateModeIfNeeded(cli) {
     __ctx.updateFields = updateFields || [];
     __ctx.baseline = baseline;
 
-    return { processingFilePath, vendor, itemsCount: items.length, baselineSize: baseline.size };
+    return { processingFilePath, vendor, itemsCount: items.length, baselineSize: baseline.size, resumed: false };
 }
 
 module.exports = {

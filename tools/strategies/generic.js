@@ -480,15 +480,14 @@ async function tryExtractWithVendorSelectors(page, vendor, urlObj, allowedFields
 }
 
 
-async function extractGeneric(page, urlObj) {
+async function extractGeneric(page, urlObj, updateCtx = null) {
 	const url = urlObj.url;
 	const vendor = urlObj.vendor || 'vendor'; // Use vendor from urlObj, fallback to 'vendor'
 	
 	// Generate metadata for this extraction
  
 	const metadata = { vendor, url, product_id: urlObj.sku, timestamp: new Date().toISOString() };
-	// Update-mode field filtering context
-	let updateCtx = null; try { updateCtx = require('../utils/manager/updateManager').getContext?.(); } catch { }
+	// Update-mode field filtering context (passed in by caller)
 	const isUpdateMode = !!(updateCtx && updateCtx.enabled);
 	const allowedFields = (isUpdateMode && Array.isArray(updateCtx.updateFields) && updateCtx.updateFields.length > 0) ? new Set(updateCtx.updateFields) : null;
 	const filterFieldsList = (list) => allowedFields ? list.filter(f => allowedFields.has(f)) : list;
@@ -521,6 +520,10 @@ async function extractGeneric(page, urlObj) {
 		weight: z.string().describe('Pack size/weight/volume text if available, e.g., 500g or 2x100ml'),
 		description: z.string().describe('Primary product description or details shown on the page'),
 		category: z.string().describe('Primary product category or breadcrumb category text shown on the page'),
+		breadcrumbs: z.array(z.object({
+			name: z.string().describe('Breadcrumb label text'),
+			url: z.string().describe('Breadcrumb URL for this level (http/https)')
+		})).describe('Breadcrumb trail as an array of {name, url} objects in order from root to current page'),
 	
 	};
 
@@ -631,6 +634,7 @@ async function extractGeneric(page, urlObj) {
 				case 'weight': return 'pack size/weight';
 				case 'description': return 'description';
 				case 'category': return 'category';
+				case 'breadcrumbs': return 'breadcrumbs (array of objects with name and url)';
 				default:
 					// For custom vendor fields, try to extract description from Zod schema
 					const fieldDef = fieldDefinitions[field];
@@ -644,6 +648,11 @@ async function extractGeneric(page, urlObj) {
 		});
 		instruction = `Extract only the following product information: ${fieldNames.join(', ')}.`;
 	}
+
+	// Strengthen breadcrumbs guidance when requested
+	if (fieldsForLLM.includes('breadcrumbs')) {
+		instruction += ' Return breadcrumbs as an ordered array of objects with fields name and url. Prefer the page breadcrumb nav or JSON-LD of type BreadcrumbList. Ensure url is absolute (http/https) and exclude duplicates like Home.';
+	}
  
 	// Build dynamic schema with only needed fields
 	const schemaFields = {};
@@ -655,10 +664,11 @@ async function extractGeneric(page, urlObj) {
 	const schema = z.object(schemaFields);
 
 
+	const settleMs = fieldsForLLM.includes('breadcrumbs') ? 25000 : 10000;
 	const extractedData = await page.extract({
 		instruction,
 		schema,
-		domSettleTimeoutMs: 10000,
+		domSettleTimeoutMs: settleMs,
 	});
 
 	// Create defaults based on field definitions to maintain consistency
@@ -677,7 +687,7 @@ async function extractGeneric(page, urlObj) {
 	const normalizedData = { ...extractedDefaults, ...extractedData };
 
 	// Extract base fields (respect allowedFields subset)
-	const { name, main_image, images, price, stock_status, weight, description, category } = normalizedData;
+	const { name, main_image, images, price, stock_status, weight, description, category, breadcrumbs } = normalizedData;
 
 	// Extract all custom fields dynamically
 	const customFieldData = {};
@@ -711,6 +721,22 @@ async function extractGeneric(page, urlObj) {
 	if (mainImage && (!allowedFields || allowedFields.has('images'))) imagesList.unshift(mainImage);
 	imagesList = Array.from(new Set(imagesList.filter(Boolean)));
 
+	// Normalize breadcrumbs: ensure array of { name, url } with valid URLs
+	let breadcrumbsList = [];
+	if (!allowedFields || allowedFields.has('breadcrumbs')) {
+		if (Array.isArray(breadcrumbs)) {
+			breadcrumbsList = breadcrumbs
+				.map(b => {
+					if (!b || typeof b !== 'object') return null;
+					const nameVal = typeof b.name === 'string' ? cleanText(b.name) : '';
+					const urlVal = typeof b.url === 'string' ? cleanAndValidateUrl(b.url) : null;
+					if (!nameVal || !urlVal) return null;
+					return { name: nameVal, url: urlVal };
+				})
+				.filter(Boolean);
+		}
+	}
+
 	// Create LLM extracted product data (including custom fields)
 	let llmProduct = { 
 		...(allowedFields && !allowedFields.has('name') ? {} : { name }),
@@ -721,6 +747,7 @@ async function extractGeneric(page, urlObj) {
 		...(allowedFields && !allowedFields.has('weight') ? {} : { weight }),
 		...(allowedFields && !allowedFields.has('description') ? {} : { description }),
 		...(allowedFields && !allowedFields.has('category') ? {} : { category }),
+		...(allowedFields && !allowedFields.has('breadcrumbs') ? {} : { breadcrumbs: breadcrumbsList }),
 		...customFieldData  // Include any custom vendor fields
 	};
 	if (allowedFields) llmProduct = filterObjectKeys(llmProduct);

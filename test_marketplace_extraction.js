@@ -20,11 +20,14 @@ async function loadStagehandCtor() {
 async function testMarketplaceExtraction() {
     console.log('🧪 Testing Marketplace Custom Field Extraction with SessionManager\n');
     
-    // Test URL - Superdrug marketplace product (to verify urlObj-based detection)
-    const testUrl = 'https://www.superdrug.com/skin/face-skin-care/face-serums/shiseido-vital-perfection-liftdefine-radiance-serum-80ml/p/mp-00108744';
+    // Test URL - default Superdrug marketplace product; can be overridden via --url
+    const argUrl = process.argv.slice(2).find(a => a.startsWith('--url='))?.slice('--url='.length)
+        || process.argv.slice(2).find(a => /^https?:\/\//i.test(a));
+    const testUrl = argUrl || 'https://www.superdrug.com/skin/face-skin-care/face-serums/shiseido-vital-perfection-liftdefine-radiance-serum-80ml/p/mp-00108744';
     
     console.log(`🎯 Target URL: ${testUrl}`);
-    console.log(`📋 Expected: Marketplace product (mp-00108744 indicates marketplace)`);
+    const skuFromUrl = (testUrl.match(/\/p\/(mp-[^\/?#]+)/i) || [])[1] || 'mp-unknown';
+    console.log(`📋 Expected: Marketplace product (${skuFromUrl} indicates marketplace)`);
     
     const StagehandCtor = await loadStagehandCtor();
     let sessionManager = null;
@@ -62,7 +65,7 @@ async function testMarketplaceExtraction() {
         const urlObj = {
             url: testUrl,
             vendor: 'superdrug',
-            sku: 'mp-00108744'  // Extract SKU from URL for identification
+            sku: skuFromUrl  // Extract SKU from URL for identification
         };
         
         console.log('\n🔄 Navigating to product page with SessionManager...');
@@ -116,6 +119,12 @@ async function testMarketplaceExtraction() {
         console.log(`📦 Stock Status: ${extractedProduct.stock_status || 'N/A'}`);
         console.log(`🔗 Product URL: ${extractedProduct.product_url || 'N/A'}`);
         
+        // Sections extracted
+        console.log('\n📄 SECTIONS:');
+        console.log('-'.repeat(30));
+        console.log(`🧩 Features:\n${extractedProduct.features || 'N/A'}`);
+        console.log(`\n📑 Product Specification:\n${extractedProduct.product_specification || 'N/A'}`);
+
         // Custom vendor fields focus
         console.log('\n🎯 CUSTOM VENDOR FIELDS:');
         console.log('-'.repeat(30));
@@ -135,7 +144,7 @@ async function testMarketplaceExtraction() {
         }
         
         // Show any other custom fields
-        const customFields = ['brand', 'ingredients', 'skin_type', 'product_code'];
+        const customFields = ['brand', 'ingredients', 'skin_type', 'product_code', 'features', 'product_specification'];
         customFields.forEach(field => {
             if (extractedProduct[field] !== undefined && extractedProduct[field] !== null && extractedProduct[field] !== '') {
                 console.log(`📋 ${field}: ${extractedProduct[field]}`);

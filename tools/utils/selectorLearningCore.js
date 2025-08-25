@@ -197,9 +197,9 @@ async function learnAndCacheSelectors(page, vendor, item) {
      
     
     const learned = {};
-    // Learn selectors for static fields, main_image, and stock_status (which often has consistent patterns)
-    // Truly dynamic fields (images array) will always use LLM
-    const baseFieldsToLearn = ['name', 'price', 'main_image', 'weight', 'description', 'category', 'stock_status'];
+    // Learn selectors for static fields, main_image, stock_status, and breadcrumbs container
+    // Truly dynamic fields (like full images array) will always use LLM
+    const baseFieldsToLearn = ['name', 'price', 'main_image', 'weight', 'description', 'category', 'stock_status', 'breadcrumbs'];
     
     // Add custom vendor fields that are suitable for selector learning (non-dynamic fields)
     const customFieldNames = Object.keys(getVendorCustomFields(vendor));
@@ -218,11 +218,13 @@ async function learnAndCacheSelectors(page, vendor, item) {
     
     // Prepare fields that need learning and prepare for selector removal/replacement
     const fieldsToProcess = fieldsToLearn.filter(field => {
+        if (field === 'breadcrumbs') {
+            return Array.isArray(item.breadcrumbs) && item.breadcrumbs.length > 0;
+        }
         const value = String(item[field] || '').trim();
         if (!value) {
             return false;
         }
-        
         return true; // Always learn new selectors for fields with values
     });
     
@@ -242,7 +244,9 @@ async function learnAndCacheSelectors(page, vendor, item) {
             let observePrompt;
            
             
-            if (field === 'main_image') {
+            if (field === 'breadcrumbs') {
+                observePrompt = `Find the breadcrumb navigation container on this page (e.g., nav with aria-label="breadcrumb", or a list of links representing the category path).`;
+            } else if (field === 'main_image') {
                 observePrompt = `Find the main product image element on this page. I need to locate the primary product image for data extraction.`;
             } else if (field === 'stock_status') {
                 if (value && value.toLowerCase().includes('out of stock')) {
@@ -305,7 +309,22 @@ async function learnAndCacheSelectors(page, vendor, item) {
                             continue;
                         }
                         
-                        if (field === 'main_image') {
+                        if (field === 'breadcrumbs') {
+                            // Validate breadcrumb container: must be visible and contain links
+                            const isVisible = await page.locator(selector).first().isVisible({ timeout: 5000 });
+                            if (isVisible) {
+                                try {
+                                    const linkCount = await page.locator(selector).first().locator('a').count({ timeout: 2000 });
+                                    if (linkCount > 0) {
+                                        observeResults.push({ field, selector, method: 'observe' });
+                                        continue;
+                                    }
+                                } catch {}
+                                // As a fallback, accept visible container
+                                observeResults.push({ field, selector, method: 'observe' });
+                                continue;
+                            }
+                        } else if (field === 'main_image') {
                             // For main_image, validate by checking src attribute
                             const testSrc = await page.locator(selector).first().getAttribute('src', { timeout: 5000 }); 
                             if (testSrc) {

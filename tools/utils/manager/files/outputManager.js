@@ -256,6 +256,29 @@ function isValidProduct(item) {
 }
 
 /**
+ * Apply vendor-specific output transformations/validation
+ * Delegates to per-vendor strategy modules when available.
+ */
+function applyVendorOutputTransform(product) {
+    try {
+        if (!product || typeof product !== 'object') return product;
+        const vendorName = (product.vendor || '').toString().trim().toLowerCase();
+        // Try load vendor strategy for transformOutput if provided
+        try {
+            if (vendorName === 'superdrug') {
+                const vendorStrategy = require('../../../strategies/superdrug');
+                if (vendorStrategy && typeof vendorStrategy.transformOutput === 'function') {
+                    return vendorStrategy.transformOutput(product);
+                }
+            }
+        } catch { }
+        return product;
+    } catch {
+        return product;
+    }
+}
+
+/**
  * Converts string prices to numbers for valid products
  * - Strips currency symbols and separators
  * - Normalizes price_history entries
@@ -318,10 +341,10 @@ async function appendItemsToOutputFile(outputFilePath, successfulItems, metadata
         console.log('[OUTPUT-MANAGER] No items to append');
         return { appended: 0, total: 0, filePath: outputFilePath, filtered: 0, totalFiltered: 0 };
     }
-    
+     
     // Filter items to only include those with valid prices
     const originalCount = successfulItems.length;
-    let validProducts = successfulItems.filter(isValidProduct);
+    let validProducts = successfulItems.filter(isValidProduct).map(applyVendorOutputTransform);
     const filteredCount = originalCount - validProducts.length;
     
     // Convert price fields to numbers for valid products
@@ -424,10 +447,10 @@ async function appendItemsToUpdateFile(updateFilePath, snapshots, metadata = {})
         console.log('[OUTPUT-MANAGER] No items to append to updates');
         return { appended: 0, total: 0, filePath: updateFilePath, filtered: 0, totalFiltered: 0 };
     }
-
+ 
     // Filter and normalize prices
     const originalCount = snapshots.length;
-    let validProducts = snapshots.filter(isValidProduct);
+    let validProducts = snapshots.filter(isValidProduct).map(applyVendorOutputTransform);;
     const filteredCount = originalCount - validProducts.length;
     validProducts = convertPricesToNumbers(validProducts);
 

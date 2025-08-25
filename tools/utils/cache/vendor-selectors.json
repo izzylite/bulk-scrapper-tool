@@ -1,7 +1,7 @@
 {
   "superdrug": {
     "last_llm_extraction": {
-      "timestamp": "2025-08-22T19:43:05.141Z",
+      "timestamp": "2025-08-25T09:21:47.101Z",
       "attempted_fields": [
         "name",
         "price",
@@ -9,10 +9,11 @@
         "weight",
         "description",
         "category",
-
         "marketplace",
         "main_image",
-        "images"
+        "images",
+        "breadcrumbs",
+        "features"
       ],
       "results": {
         "name": {
@@ -39,7 +40,6 @@
           "found": true,
           "value_type": "string"
         },
-
         "marketplace": {
           "found": false,
           "value_type": "boolean"
@@ -51,6 +51,14 @@
         "images": {
           "found": true,
           "value_type": "array"
+        },
+        "breadcrumbs": {
+          "found": true,
+          "value_type": "array"
+        },
+        "features": {
+          "found": true,
+          "value_type": "string"
         }
       }
     },
@@ -155,6 +163,30 @@
           "learned_at": "2025-08-22T10:41:52.993Z",
           "success_count": 10,
           "last_success": "2025-08-22T10:43:28.314Z"
+        }
+      ],
+      "main_image": [
+        {
+          "selector": "xpath=/html[1]/body[1]/app-root[1]/cx-storefront[1]/main[1]/cx-page-layout[1]/e2-product-outlets[1]/div[1]/section[1]/e2-product-images-grid[1]/section[1]/e2core-media[1]/img[1]",
+          "learned_at": "2025-08-25T08:29:46.045Z",
+          "success_count": 6,
+          "last_success": "2025-08-25T09:21:42.653Z"
+        }
+      ],
+      "breadcrumbs": [
+        {
+          "selector": "xpath=/html[1]/body[1]/app-root[1]/cx-storefront[1]/main[1]/cx-page-layout[1]/e2-product-outlets[1]/cx-page-layout[2]/cx-page-slot[1]/e2-breadcrumb[1]/div[1]",
+          "learned_at": "2025-08-25T08:29:46.045Z",
+          "success_count": 1,
+          "last_success": "2025-08-25T08:29:46.045Z"
+        }
+      ],
+      "marketplace": [
+        {
+          "selector": "xpath=/html[1]/body[1]/app-root[1]/cx-storefront[1]/main[1]/cx-page-layout[1]/e2-product-outlets[1]/div[1]/section[1]/cx-page-layout[1]/cx-page-slot[1]/mp-product-add-to-cart[1]/div[1]/div[2]",
+          "learned_at": "2025-08-25T08:29:46.045Z",
+          "success_count": 6,
+          "last_success": "2025-08-25T09:21:42.653Z"
         }
       ]
     }
