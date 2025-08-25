@@ -120,6 +120,11 @@ function validateProcessingFileStructure(data) {
     // Check optional fields
     if (data.exclude !== undefined && !Array.isArray(data.exclude)) return false;
     if (data.source_files !== undefined && !Array.isArray(data.source_files)) return false;
+    // Update-mode optional metadata
+    if (data.mode !== undefined && typeof data.mode !== 'string') return false;
+    if (data.update_key !== undefined && typeof data.update_key !== 'string') return false;
+    if (data.update_fields !== undefined && !Array.isArray(data.update_fields)) return false;
+    if (data.stale_before !== undefined && typeof data.stale_before !== 'string') return false;
     
     // Validate items structure
     for (const item of data.items) {

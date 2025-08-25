@@ -12,6 +12,7 @@ const { z } = require('zod');
 const { withFileLock, removeUrlsFromProcessingFile, updateErrorsInProcessingFile, findActiveProcessingFile, cleanupProcessingFile, validateProcessingFileStructure } = require('./tools/utils/manager/files/pendingManager');
 const inputManager = require('./tools/utils/manager/files/inputManager');
 const outputManager = require('./tools/utils/manager/files/outputManager');
+const updateManager = require('./tools/utils/manager/updateManager');
 const SessionManager = require('./tools/utils/manager/sessionManager');
 const cacheManager = require('./tools/utils/cache/cacheManager');
 const { extractGeneric } = require('./tools/strategies/generic');
@@ -28,54 +29,29 @@ async function loadStagehandCtor() {
 // Initialize SessionManager instance
 const sessionManager = new SessionManager();
 
-
-
-
 function parseArgs(argv) {
-    const args = { batch: 20, batches: 1, limit: 100 };
+    const args = { batch: 20, batches: 1, limit: 100, update: false, vendors: [], updateFields: null, updateKey: null, staleDays: null };
     for (let i = 2; i < argv.length; i++) {
         const a = argv[i];
         if (!a) continue;
-        if (a === '--batch' || a === '-b') {
-            const n = parseInt(argv[i + 1], 10);
-            if (!Number.isNaN(n) && n > 0) args.batch = n;
-            i++;
-            continue;
-        }
-        if (a.startsWith('--batch=')) {
-            const n = parseInt(a.slice('--batch='.length), 10);
-            if (!Number.isNaN(n) && n > 0) args.batch = n;
-            continue;
-        }
-        if (a === '--batches' || a === '-c') {
-            const n = parseInt(argv[i + 1], 10);
-            if (!Number.isNaN(n) && n > 0) args.batches = n;
-            i++;
-            continue;
-        }
-        if (a.startsWith('--batches=')) {
-            const n = parseInt(a.slice('--batches='.length), 10);
-            if (!Number.isNaN(n) && n > 0) args.batches = n;
-            continue;
-        }
-        if (a === '--limit' || a === '-l') {
-            const n = parseInt(argv[i + 1], 10);
-            if (!Number.isNaN(n) && n > 0) args.limit = n;
-            i++;
-            continue;
-        }
-        if (a.startsWith('--limit=')) {
-            const n = parseInt(a.slice('--limit='.length), 10);
-            if (!Number.isNaN(n) && n > 0) args.limit = n;
-            continue;
-        }
+        if (a === '--batch' || a === '-b') { const n = parseInt(argv[i + 1], 10); if (!Number.isNaN(n) && n > 0) args.batch = n; i++; continue; }
+        if (a.startsWith('--batch=')) { const n = parseInt(a.slice('--batch='.length), 10); if (!Number.isNaN(n) && n > 0) args.batch = n; continue; }
+        if (a === '--batches' || a === '-c') { const n = parseInt(argv[i + 1], 10); if (!Number.isNaN(n) && n > 0) args.batches = n; i++; continue; }
+        if (a.startsWith('--batches=')) { const n = parseInt(a.slice('--batches='.length), 10); if (!Number.isNaN(n) && n > 0) args.batches = n; continue; }
+        if (a === '--limit' || a === '-l') { const n = parseInt(argv[i + 1], 10); if (!Number.isNaN(n) && n > 0) args.limit = n; i++; continue; }
+        if (a.startsWith('--limit=')) { const n = parseInt(a.slice('--limit='.length), 10); if (!Number.isNaN(n) && n > 0) args.limit = n; continue; }
+        if (a === '--update') { args.update = true; continue; }
+        if (a.startsWith('--vendor=')) { const v = a.slice('--vendor='.length); args.vendors = v.split(',').map(s => s.trim()).filter(Boolean); continue; }
+        if (a === '--vendor') { const v = argv[i + 1]; if (v) { args.vendors = v.split(',').map(s => s.trim()).filter(Boolean); } i++; continue; }
+        if (a.startsWith('--update-fields=')) { const f = a.slice('--update-fields='.length); args.updateFields = f.split(',').map(s => s.trim()).filter(Boolean); continue; }
+        if (a === '--update-fields') { const f = argv[i + 1]; if (f) { args.updateFields = f.split(',').map(s => s.trim()).filter(Boolean); } i++; continue; }
+        if (a.startsWith('--update-key=')) { args.updateKey = a.slice('--update-key='.length).trim(); continue; }
+        if (a === '--update-key') { const k = argv[i + 1]; if (k) { args.updateKey = k.trim(); } i++; continue; }
+        if (a.startsWith('--stale-days=')) { const d = parseInt(a.slice('--stale-days='.length), 10); if (!Number.isNaN(d) && d >= 0) args.staleDays = d; continue; }
+        if (a === '--stale-days') { const d = parseInt(argv[i + 1], 10); if (!Number.isNaN(d) && d >= 0) args.staleDays = d; i++; continue; }
     }
     return args;
 }
-
-
-
-
 
 // Enhanced blocking check that considers extraction results and incomplete data
 async function isBlocked(page, result) {
@@ -107,23 +83,13 @@ async function isBlocked(page, result) {
     } catch { return false; }
 }
 
-
-
 async function navigateWithRetry(page, targetUrl, workerId, workerSessionManager = null, maxAttempts = 3) {
-    // Check if current session is blocked BEFORE attempting navigation (only if workerSessionManager is provided)
-
     let lastError;
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
         try {
             console.log(`[SESSION ${workerId}] Navigating to page (attempt ${attempt}/${maxAttempts})`);
             const start = Date.now();
-
-            // Set longer timeout and options for navigation
-            await page.goto(targetUrl, {
-                waitUntil: 'domcontentloaded', // Don't wait for all resources, just DOM
-                timeout: 30000 // 30 second timeout
-            });
-
+            await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
             const end = Date.now();
             console.log(`[SESSION ${workerId}] Navigated to page in ${end - start}ms`);
             return;
@@ -131,60 +97,37 @@ async function navigateWithRetry(page, targetUrl, workerId, workerSessionManager
             if (sessionManager.getShuttingDown()) throw new Error('Shutdown in progress');
             lastError = err;
             const message = String(err && err.message ? err.message : err || 'unknown error');
-
-            // Check if this is a session termination error that needs session rotation
             const isTerminationError = /terminated|session.*closed|browser.*closed|connection.*closed|target.*closed/i.test(message);
-
             if (isTerminationError) {
                 console.log(`[NAVIGATE] Session terminated during navigation: ${message}`);
-                // Mark this as a termination error so calling code can handle it
                 const terminationError = new Error(`Session terminated: ${message}`);
                 terminationError.isTermination = true;
                 terminationError.originalError = err;
                 throw terminationError;
             }
-
             console.log(`[NAVIGATE] Attempt ${attempt}/${maxAttempts} failed: ${attempt >= maxAttempts ? message : 'Error, retrying...'}`);
-
-            if (attempt < maxAttempts) {
-                // Add a small delay before retrying
-                await new Promise(resolve => setTimeout(resolve, 2000));
-                continue;
-            }
+            if (attempt < maxAttempts) { await new Promise(resolve => setTimeout(resolve, 2000)); continue; }
         }
     }
-    // After exhausting attempts, throw the last error
     throw lastError;
 }
 
 async function extractWithStagehand(workerSessionManager, urlObj, pageOverride) {
     const url = urlObj.url;
-
     let page = pageOverride || await sessionManager.getSafePage(workerSessionManager);
     const workerId = workerSessionManager.getWorkerId();
-
-    try {
-        await navigateWithRetry(page, url, workerId, workerSessionManager);
-    } catch (err) {
-        // Handle session termination during navigation
+    try { await navigateWithRetry(page, url, workerId, workerSessionManager); }
+    catch (err) {
         if (err.isTermination) {
             console.log(`[SESSION ${workerId}] Session terminated during navigation, rotating...`);
             logError('navigation_termination', { source_url: url, error: err.message });
             if (sessionManager.getShuttingDown()) throw new Error('Shutdown in progress');
             await workerSessionManager.rotate('navigation_terminated');
-
             page = await sessionManager.getSafePage(workerSessionManager);
             await navigateWithRetry(page, url, workerId, workerSessionManager);
-        } else {
-            throw err;
-        }
+        } else { throw err; }
     }
-
     if (sessionManager.getShuttingDown()) throw new Error('Shutdown in progress');
-
-
-    // Wait for likely product UI anchors rather than sleeping
-
 
     try {
         console.log(`[SESSION ${workerId}] Extracting product...`);
@@ -197,14 +140,12 @@ async function extractWithStagehand(workerSessionManager, urlObj, pageOverride) 
             logError('blocked_detected_after_extract', { product_id: item.product_id, vendor: item.vendor });
             if (sessionManager.getShuttingDown()) throw new Error('Shutdown in progress');
             await workerSessionManager.rotate('blocked_after_extract');
-
-            page = await sessionManager.getSafePage(workerSessionManager); // Use default page instead of creating new one
+            page = await sessionManager.getSafePage(workerSessionManager);
             await navigateWithRetry(page, url, workerId, workerSessionManager);
             const product2 = await extractGeneric(page, urlObj);
             logError('blocked_retry_success', { product_id: product2.product_id, vendor: product2.vendor });
             return { ...product2, retried: true };
         }
-        // Validate required fields; if missing and CSS is currently blocked, retry once with CSS allowed
         const hasCore = item && item.name && item.price;
         const cssBlocked = (sessionManager.pagePerfConfig.get(page)?.blockStyles === true);
         if (!hasCore && cssBlocked && !item?.retried_css) {
@@ -222,7 +163,7 @@ async function extractWithStagehand(workerSessionManager, urlObj, pageOverride) 
             logError('session_restart_after_error', { source_url: url, error: msg });
             if (sessionManager.getShuttingDown()) throw new Error('Shutdown in progress');
             await workerSessionManager.rotate('extract_error');
-            page = await sessionManager.getSafePage(workerSessionManager); // Use default page instead of creating new one
+            page = await sessionManager.getSafePage(workerSessionManager);
             await navigateWithRetry(page, url, workerId, workerSessionManager);
             const product3 = await extractGeneric(page, urlObj);
             return { ...product3, retried: true };
@@ -231,88 +172,66 @@ async function extractWithStagehand(workerSessionManager, urlObj, pageOverride) 
     }
 }
 
-function chunkArray(array, size) {
-    const chunks = [];
-    for (let i = 0; i < array.length; i += size) {
-        chunks.push(array.slice(i, i + size));
-    }
-    return chunks;
-}
-
-
+function chunkArray(array, size) { const chunks = []; for (let i = 0; i < array.length; i += size) { chunks.push(array.slice(i, i + size)); } return chunks; }
 
 // Register signal handlers
 process.on('SIGINT', () => { sessionManager.setShuttingDown(true); sessionManager.gracefulShutdown('SIGINT'); });
 process.on('SIGTERM', () => { sessionManager.setShuttingDown(true); sessionManager.gracefulShutdown('SIGTERM'); });
 
-const providers = {
-    packetstream: { type: 'external', server: "http://proxy.packetstream.io:31112", username: process.env.PS_USER, password: process.env.PS_PASS },
-    // oxylabs: { server: "http://pr.oxylabs.io:7777", user: process.env.OXY_USER, pass: process.env.OXY_PASS },
-};
-
-
-
-
-
+ 
 async function appendBatchToOutput(outputPath, meta, batchItems, processingFilePath) {
-
     const successfulItems = (batchItems || []).filter(item => item && !item.error);
     const errorItems = (batchItems || []).filter(item => item && item.error);
-    console.log(`[APPEND] Appending ${successfulItems.length} successful items to output`);
-    // Use outputManager to handle the appending
-    const result = outputManager.appendItemsToOutputFile(outputPath, successfulItems, meta);
 
-    // Handle processing file updates for successful and failed items
+    // Enrich meta from processing file (mode, vendor, update fields)
+    let processingData = null;
+    try { if (processingFilePath && fs.existsSync(processingFilePath)) { processingData = JSON.parse(fs.readFileSync(processingFilePath, 'utf8')); } } catch { }
+    const mode = (processingData && processingData.mode) || meta.mode;
+    const vendor = (processingData && processingData.vendor) || meta.vendor;
+    const updateKey = (processingData && processingData.update_key) || meta.update_key || updateManager.getContext().updateKey;
+    const updateFields = (processingData && processingData.update_fields) || meta.update_fields || updateManager.getContext().updateFields;
+    const inputFileName = (processingData && Array.isArray(processingData.source_files) && processingData.source_files[0]) || meta.inputFileName;
+
+    console.log(`[APPEND] Appending ${successfulItems.length} ${mode === 'update' ? 'updated snapshots' : 'successful items'} to output`);
+
+    let result;
+    if (mode === 'update') {
+        const mergedSnapshots = updateManager.mergeSnapshots(successfulItems, updateKey, updateFields, updateManager.getContext().baseline);
+        result = outputManager.appendItemsToUpdateFile(outputPath, mergedSnapshots, { vendor, sourceFile: meta.source_file, inputFileName });
+    } else {
+        result = outputManager.appendItemsToOutputFile(outputPath, successfulItems, { vendor, sourceFile: meta.source_file, inputFileName });
+    }
+
     const operations = [];
-
     if (processingFilePath && fs.existsSync(processingFilePath)) {
-        // Remove successful URLs from processing file
         if (successfulItems.length > 0) {
             const successUrls = successfulItems.map(item => item.source_url);
-            operations.push(
-                removeUrlsFromProcessingFile(processingFilePath, successUrls)
-                    .then(() => console.log(`[APPENDED] (+${successUrls.length} items successfully extracted and appended to output)`))
-            );
+            operations.push(removeUrlsFromProcessingFile(processingFilePath, successUrls).then(() => console.log(`[APPENDED] (+${successUrls.length} items successfully processed and recorded)`)));
         }
-
-        // Update errors in processing file
-        if (errorItems.length > 0) {
-            operations.push(
-                updateErrorsInProcessingFile(processingFilePath, errorItems)
-                    .then(() => console.log(`[ERRORS] ${errorItems.length} URLs failed extraction (errors recorded in processing file)`))
-            );
-        }
+        if (errorItems.length > 0) { operations.push(updateErrorsInProcessingFile(processingFilePath, errorItems).then(() => console.log(`[ERRORS] ${errorItems.length} URLs failed extraction (errors recorded in processing file)`))); }
     }
-
-    // Wait for all operations to complete in parallel
-    if (operations.length > 0) {
-        await Promise.all(operations);
-    }
-
+    if (operations.length > 0) { await Promise.all(operations); }
     return result;
 }
 
-async function processScrapperWorkflow(stagehandCtor, batchSize, maxConcurrentBatches = 1, totalLimit = Infinity) {
-    // Initialize SessionManager with constructor and logging
+async function processScrapperWorkflow(stagehandCtor, batchSize, maxConcurrentBatches = 1, totalLimit = Infinity, cli = {}) {
     sessionManager.initialize(stagehandCtor, logError);
 
     try {
+        // Prepare update-mode if requested
+        if (cli.update) { await updateManager.prepareUpdateModeIfNeeded(cli); }
+
         // Step 1: Check for active processing file
         console.log('[WORKFLOW] Checking for active processing files...');
         let activeProcessingFile = findActiveProcessingFile();
 
         if (!activeProcessingFile) {
-            // Step 2: Check input directory and process if needed
             console.log('[WORKFLOW] No active processing file found, checking input directory...');
             try {
                 const processingFilePath = inputManager.processInputDirectory();
                 console.log(`[WORKFLOW] Created processing file: ${path.basename(processingFilePath)}`);
-
-                // Get the newly created processing file
                 activeProcessingFile = findActiveProcessingFile();
-                if (!activeProcessingFile) {
-                    throw new Error('Failed to find newly created processing file');
-                }
+                if (!activeProcessingFile) { throw new Error('Failed to find newly created processing file'); }
             } catch (err) {
                 if (err.message.includes('No input files found')) {
                     console.log('[WORKFLOW] No input files found in scrapper/input directory');
@@ -323,109 +242,72 @@ async function processScrapperWorkflow(stagehandCtor, batchSize, maxConcurrentBa
             }
         }
 
-        // Step 3: Process the active file
         console.log(`[WORKFLOW] Processing active file: ${activeProcessingFile.name} (vendor: ${activeProcessingFile.vendor})`);
 
-        // Read and validate the processing file
         let processingData;
         try {
             const rawData = fs.readFileSync(activeProcessingFile.path, 'utf8');
             processingData = JSON.parse(rawData);
-
-            if (!validateProcessingFileStructure(processingData)) {
-                throw new Error('Invalid processing file structure');
-            }
+            if (!validateProcessingFileStructure(processingData)) { throw new Error('Invalid processing file structure'); }
         } catch (err) {
             console.error(`[ERROR] Failed to read/validate processing file: ${err.message}`);
             return;
         }
 
-        // Step 4: Set up output file using outputManager
-        // Use the first original input filename, or fallback to processing filename
-        const inputFileName = (processingData.source_files && processingData.source_files.length > 0)
-            ? processingData.source_files[0]
-            : activeProcessingFile.name;
-
-        const outputPath = outputManager.createOutputFile(
-            processingData.vendor,
-            activeProcessingFile.name,
-            inputFileName
-        );
+        const inputFileName = (processingData.source_files && processingData.source_files.length > 0) ? processingData.source_files[0] : activeProcessingFile.name;
+        let outputPath;
+        if (processingData.mode === 'update') {
+            outputPath = outputManager.createUpdateOutputFile(processingData.vendor, activeProcessingFile.name, inputFileName);
+        } else {
+            // Step 4: Set up output file using outputManager
+            // Use the first original input filename, or fallback to processing filename
+            outputPath = outputManager.createOutputFile(processingData.vendor, activeProcessingFile.name, inputFileName);
+        }
         console.log(`[WORKFLOW] Output will be saved to: ${outputPath}`);
 
-        // Step 5: Process items in batches
         const itemsToProcess = processingData.items || [];
         const limitedItems = Number.isFinite(totalLimit) ? itemsToProcess.slice(0, Math.max(0, totalLimit)) : itemsToProcess;
         const totalBatches = chunkArray(limitedItems, batchSize);
-
         console.log(`[START] Processing ${limitedItems.length} items in ${totalBatches.length} batches of up to ${batchSize}`);
         console.log(`[PROGRESS] ${processingData.processed_count || 0}/${processingData.total_count || 0} items already processed`);
 
-        // Concurrency limiter for batches
         let nextBatch = 0;
+        const sessionManagers = await sessionManager.createMultipleSessionManagers(maxConcurrentBatches, appendBatchToOutput);
 
-        // Create multiple session managers using SessionManager class
-        const sessionManagers = await sessionManager.createMultipleSessionManagers(
-            maxConcurrentBatches,
-            appendBatchToOutput
-        );
-
-        // Now run the actual workers
         const workers = sessionManagers.map(async (workerSessionManager) => {
             const workerId = workerSessionManager.getWorkerId();
             try {
                 while (nextBatch < totalBatches.length) {
                     const idx = nextBatch++;
-
                     const batchItems = totalBatches[idx];
                     console.log(`[SESSION ${workerId}] Processing ${batchItems.length} urls in batch ${idx + 1}/${totalBatches.length}`);
-
-                    // Register per-worker buffer before processing this batch
                     if (sessionManager.getShuttingDown()) break;
                     workerSessionManager.registerBuffer(outputPath, activeProcessingFile.name, activeProcessingFile.path);
-
-                    // Process all items sequentially in this single tab
                     const processed = await processBucket(workerSessionManager, batchItems);
-
-                    // Persist items for this batch via the session buffer
                     try { await workerSessionManager.flushBuffer(); } catch { }
                     if (sessionManager.getShuttingDown()) break;
                     console.log(`[SESSION ${workerId}] Successfully processed batch ${idx + 1}/${totalBatches.length} (items: ${processed})`);
-
                 }
             } catch (workerError) {
                 console.log(`[SESSION ${workerId}] Worker error:`, workerError.message);
                 throw workerError;
             } finally {
-                // Attempt to flush any remaining, not yet appended items
                 try { await workerSessionManager.flushBuffer(); } catch { }
                 console.log(`[SESSION ${workerId}] Closing session...`);
-                try { await workerSessionManager.close(); } catch (e) {
-                    console.log(`[SESSION ${workerId}] Error closing session:`, e.message);
-                }
+                try { await workerSessionManager.close(); } catch (e) { console.log(`[SESSION ${workerId}] Error closing session:`, e.message); }
             }
         });
 
         await Promise.all(workers);
 
-        // Step 6: Cleanup
         console.log(`[CLEANUP] Processing file cleanup`);
         cleanupProcessingFile(activeProcessingFile.path, activeProcessingFile.name);
-
         console.log(`[DONE] Completed processing for vendor: ${processingData.vendor}`);
-
-        // Display output summary
         const summary = outputManager.getVendorSummary(processingData.vendor);
         console.log(`[SUMMARY] Vendor: ${summary.vendor}, Files: ${summary.totalFiles}, Successful Items: ${summary.totalItems}`);
 
-    } finally {
-        // no-op: each worker manages its own session
-    }
+    } finally { }
 }
-
-
-
-
 
 async function processBucket(workerSessionManager, objectsSubset) {
     let processedCount = 0;
@@ -444,7 +326,7 @@ async function processBucket(workerSessionManager, objectsSubset) {
             let item = null;
             // Check if this URL has variants
             if (Array.isArray(urlObj.variants) && urlObj.variants.length > 0) {
-                
+
                 console.log(`[SESSION ${workerId}] Found ${urlObj.variants.length} variants, extracting main + variants...`);
 
                 // Create sub-iteration including main object + variants
@@ -475,7 +357,7 @@ async function processBucket(workerSessionManager, objectsSubset) {
                         mainProduct = extractedItem;
                     } else {
                         variantExtractions.push({
-                            ...extractedItem,  
+                            ...extractedItem,
                         });
                     }
                 }
@@ -509,7 +391,7 @@ async function processBucket(workerSessionManager, objectsSubset) {
 
         } catch (err) {
 
-             function handleExtractionError(urlObj, errMsg, err, workerSessionManager, processedCount, isVariant = false) {
+            function handleExtractionError(urlObj, errMsg, err, workerSessionManager, processedCount, isVariant = false) {
                 console.error('[Extractor] Error for ', isVariant ? 'variant' : 'main product', ' URL:', urlObj.url, '-', errMsg);
                 console.log(`[RETRY] URL remains in processing file for future retry: ${urlObj.url}`);
                 logError('extract_error', { url: urlObj.url, error: errMsg, ...(err && err.meta ? err.meta : {}) });
@@ -573,7 +455,8 @@ async function processBucket(workerSessionManager, objectsSubset) {
 }
 
 async function main() {
-    const { batch, batches, limit } = parseArgs(process.argv);
+    const args = parseArgs(process.argv);
+    const { batch, batches, limit } = args;
     const startTs = Date.now();
 
     console.log('🤖 AI Scrapper - Stagehand Product Extractor');
@@ -584,9 +467,9 @@ async function main() {
         const concurrentBatches = Math.min(process.env.MAX_BATCH || 5, Number(process.env.MAX_CONCURRENT_BATCHES) || Number(batches) || 1);
         const totalLimit = Number.isFinite(Number(process.env.TOTAL_LIMIT || limit)) ? Number(process.env.TOTAL_LIMIT || limit) : Infinity;
 
-        console.log(`⚙️  Configuration: batch=${batch || 20}, concurrent=${concurrentBatches}, limit=${totalLimit === Infinity ? 'unlimited' : totalLimit}`);
+        console.log(`⚙️  Configuration: batch=${batch || 20}, concurrent=${concurrentBatches}, limit=${totalLimit === Infinity ? 'unlimited' : totalLimit}${args.update ? ', mode=update' : ''}${Array.isArray(args.vendors) && args.vendors.length ? `, vendors=${args.vendors.join(',')}` : ''}`);
 
-        await processScrapperWorkflow(StagehandCtor, batch || 20, concurrentBatches, totalLimit);
+        await processScrapperWorkflow(StagehandCtor, batch || 20, concurrentBatches, totalLimit, args);
     } catch (err) {
         console.error('❌ [Scrapper] Error:', err && err.message ? err.message : err);
         logError('scrapper_error', { error: String(err && err.message ? err.message : err) });
@@ -602,7 +485,6 @@ async function main() {
             console.log(`⏱️  Total duration: ${seconds}s`);
         }
 
-        // Display cache statistics
         const cacheStats = cacheManager.getStats();
         console.log('\n📊 Cache Performance Summary:');
         Object.entries(cacheStats).forEach(([cacheName, stats]) => {
@@ -614,14 +496,12 @@ async function main() {
             }
         });
 
-        // Display selector learning statistics
         const learningStats = selectorLearning.getLearningStats();
         console.log('\n🧠 Selector Learning Summary:');
         console.log(`  Active learning task: ${learningStats.isActive ? 'Yes' : 'No'}`);
         console.log(`  Vendors with pending fields: ${learningStats.pendingVendors}`);
         console.log(`  Total pending fields: ${learningStats.totalPendingFields}`);
 
-        // Display logging statistics
         const logStats = getLogStats();
         console.log('\n📄 Logging Summary:');
         console.log(`  Log file exists: ${logStats.exists ? 'Yes' : 'No'}`);
@@ -632,10 +512,7 @@ async function main() {
     }
 }
 
-
-if (require.main === module) {
-    main();
-}
+if (require.main === module) { main(); }
 
 
 

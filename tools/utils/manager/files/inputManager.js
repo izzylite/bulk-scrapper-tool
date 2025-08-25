@@ -333,10 +333,38 @@ function processInputDirectory() {
     return processingFilePath;
 }
 
+/**
+ * Create a processing file directly from in-memory items for update mode.
+ * items format (minimal): [{ url, vendor, image_url?, sku? }]
+ * extraMeta: optional fields merged into the root (e.g., mode, update_key, update_fields, stale_before)
+ * @param {string} vendor
+ * @param {Array} items
+ * @param {Object} extraMeta
+ * @param {Array} sourceFiles
+ * @returns {string} Path to created processing file
+ */
+function createProcessingFromItems(vendor, items, extraMeta = {}, sourceFiles = []) {
+    ensureDirectoriesExist();
+    const safeItems = Array.isArray(items) ? items : [];
+    const processingData = {
+        active: true,
+        vendor,
+        total_count: safeItems.length,
+        processed_count: 0,
+        exclude: [],
+        source_files: sourceFiles,
+        items: safeItems,
+        ...extraMeta
+    };
+    return saveToProcessingDirectory(processingData);
+}
+
 module.exports = {
     processInputDirectory,
     getInputFiles,
     ensureDirectoriesExist,
     INPUT_DIR,
-    PROCESSING_DIR
+    PROCESSING_DIR,
+    // new helper for update mode
+    createProcessingFromItems
 };

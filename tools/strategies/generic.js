@@ -1,7 +1,6 @@
 'use strict';
 
 const { z } = require('zod');
-const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const cacheManager = require('../utils/cache/cacheManager');
@@ -213,27 +212,27 @@ async function trySelectorsForField(page, field, selectors, vendor, timeout = 15
 	if (!Array.isArray(selectors) || selectors.length === 0) {
 		return { field, value: null, successfulSelector: null };
 	}
-
+	
 	// Check if page is still valid before proceeding
 	if (!(await isPageValid(page))) {
 		console.log(`[SELECTOR_ERROR] Page/context is closed, skipping selector extraction for ${field}`);
 		return { field, value: null, successfulSelector: null };
 	}
-
+	
 	// Try selectors in order (most successful first)
 	for (const selectorObj of selectors) {
 		const selector = selectorObj.selector;
 		if (!selector) continue;
-
+		
 		// Handle comma-separated fallback selectors
 		const selectorOptions = selector.includes(',') ? 
 			selector.split(',').map(s => s.trim()).filter(Boolean) : 
 			[selector];
-
+		
 		for (const selectorOption of selectorOptions) {
 			try {
 				let value = null;
-
+				
 				if (field === 'main_image') {
 					const src = await page.locator(selectorOption).first().getAttribute('src', { timeout: Math.min(timeout, 5000) });
 					value = src ? cleanAndValidateUrl(src.trim()) : null;
@@ -268,7 +267,7 @@ async function trySelectorsForField(page, field, selectors, vendor, timeout = 15
 						value = text ? text.trim() : null;
 					}
 				}
-
+				
 				if (value !== null && value !== '' && value !== undefined) {
 					return { field, value, successfulSelector: selectorOption };
 				}
@@ -283,11 +282,11 @@ async function trySelectorsForField(page, field, selectors, vendor, timeout = 15
 			}
 		}
 	}
-
+	
 	return { field, value: null, successfulSelector: null };
 }
 
-async function tryExtractWithVendorSelectors(page, vendor, urlObj) {
+async function tryExtractWithVendorSelectors(page, vendor, urlObj, allowedFields = null) {
 	try {
 		const all = loadVendorSelectors();
 		const vendorData = all[vendor];
@@ -308,11 +307,14 @@ async function tryExtractWithVendorSelectors(page, vendor, urlObj) {
 		if (selectors && Object.keys(selectors).length > 0) {
 			console.log(`[VENDOR_STRATEGY] Found ${Object.keys(selectors).length} learned selectors`);
 
-			const baseFieldsToExtract = ['name', 'price', 'weight', 'description', 'category', 'main_image', 'stock_status'];
+			let baseFieldsToExtract = ['name', 'price', 'weight', 'description', 'category', 'main_image', 'stock_status'];
+			if (allowedFields) {
+				baseFieldsToExtract = baseFieldsToExtract.filter(f => allowedFields.has(f));
+			}
 
 			// Add custom vendor fields that can be extracted via selectors
 			const customFieldNames = Object.keys(getVendorCustomFields(vendor));
-			const customFieldsToExtract = customFieldNames.filter(field => {
+			let customFieldsToExtract = customFieldNames.filter(field => {
 				// Only extract string/boolean fields via selectors, not arrays or complex types
 				const fieldDef = getVendorCustomFields(vendor)[field];
 				return fieldDef && fieldDef._def && (
@@ -320,6 +322,9 @@ async function tryExtractWithVendorSelectors(page, vendor, urlObj) {
 					fieldDef._def.typeName === 'ZodBoolean'
 				);
 			});
+			if (allowedFields) {
+				customFieldsToExtract = customFieldsToExtract.filter(f => allowedFields.has(f));
+			}
 
 			const fieldsToExtract = [...baseFieldsToExtract, ...customFieldsToExtract];
 
@@ -365,23 +370,28 @@ async function tryExtractWithVendorSelectors(page, vendor, urlObj) {
 
 								if (vendorResult) {
 									// Handle name if extracted by vendor strategy
-									if (vendorResult.name) {
+									if (vendorResult.name && (!allowedFields || allowedFields.has('name'))) {
 										results.push({ field: 'name', value: vendorResult.name, successfulSelector: null });
 									}
 
 									// Handle images
-									if (vendorResult.images) {
+									if (vendorResult.images && (!allowedFields || allowedFields.has('images'))) {
 										results.push({ field: 'images', value: vendorResult.images, successfulSelector: null });
 									}
 
 									// Handle main_image if not already covered by selectors
-									if (vendorResult.main_image && (!selectors || !selectors.main_image || !Array.isArray(selectors.main_image) || selectors.main_image.length === 0)) {
+									if (
+										vendorResult.main_image &&
+										(!selectors || !selectors.main_image || !Array.isArray(selectors.main_image) || selectors.main_image.length === 0) &&
+										(!allowedFields || allowedFields.has('main_image'))
+									) {
 										results.push({ field: 'main_image', value: vendorResult.main_image, successfulSelector: null });
 									}
 
 									// Handle custom vendor fields
 									const customFieldNames = Object.keys(getVendorCustomFields(vendor));
-									for (const fieldName of customFieldNames) {
+									const filteredCustomFieldNames = allowedFields ? customFieldNames.filter(n => allowedFields.has(n)) : customFieldNames;
+									for (const fieldName of filteredCustomFieldNames) {
 										if (vendorResult[fieldName] !== undefined && vendorResult[fieldName] !== null && vendorResult[fieldName] !== '') {
 											results.push({ field: fieldName, value: vendorResult[fieldName], successfulSelector: null });
 										}
@@ -424,6 +434,10 @@ async function tryExtractWithVendorSelectors(page, vendor, urlObj) {
 		// Apply results to the result object and track successful selectors
 		for (const { field, value, successfulSelector } of flatResults) {
 			if (value !== null && value !== '' && value !== undefined) {
+				// Respect allowedFields filtering if provided
+				if (allowedFields && !allowedFields.has(field)) {
+					continue;
+				}
 				// For boolean fields, accept false as a valid value
 				const customFields = getVendorCustomFields(vendor);
 				const fieldDef = customFields[field];
@@ -443,12 +457,12 @@ async function tryExtractWithVendorSelectors(page, vendor, urlObj) {
 		// Update success tracking for working selectors (only if needed to reduce I/O)
 		if (Object.keys(successfulSelectors).length > 0) {
 			// Check if any of the successful selectors actually need updates (not already at max count)
-			const vendorData = loadVendorSelectors()[vendor];
+			const vendorData2 = loadVendorSelectors()[vendor];
 			const needsUpdate = Object.entries(successfulSelectors).some(([field, selector]) => {
-				if (!vendorData || !vendorData.selectors || !Array.isArray(vendorData.selectors[field])) {
+				if (!vendorData2 || !vendorData2.selectors || !Array.isArray(vendorData2.selectors[field])) {
 					return true; // New selector, needs update
 				}
-				const existing = vendorData.selectors[field].find(s => s.selector === selector);
+				const existing = vendorData2.selectors[field].find(s => s.selector === selector);
 				return !existing || existing.success_count < 10;
 			});
 
@@ -469,10 +483,21 @@ async function tryExtractWithVendorSelectors(page, vendor, urlObj) {
 async function extractGeneric(page, urlObj) {
 	const url = urlObj.url;
 	const vendor = urlObj.vendor || 'vendor'; // Use vendor from urlObj, fallback to 'vendor'
-
+	
 	// Generate metadata for this extraction
  
 	const metadata = { vendor, url, product_id: urlObj.sku, timestamp: new Date().toISOString() };
+	// Update-mode field filtering context
+	let updateCtx = null; try { updateCtx = require('../utils/manager/updateManager').getContext?.(); } catch { }
+	const isUpdateMode = !!(updateCtx && updateCtx.enabled);
+	const allowedFields = (isUpdateMode && Array.isArray(updateCtx.updateFields) && updateCtx.updateFields.length > 0) ? new Set(updateCtx.updateFields) : null;
+	const filterFieldsList = (list) => allowedFields ? list.filter(f => allowedFields.has(f)) : list;
+	const filterObjectKeys = (obj) => {
+		if (!allowedFields || !obj || typeof obj !== 'object') return obj;
+		const out = {};
+		for (const k of Object.keys(obj)) { if (allowedFields.has(k)) out[k] = obj[k]; }
+		return out;
+	};
 
 	// Check URL result cache first (skip for dynamic fields that change frequently)
 	const cacheKey = `${vendor}:${url}`;
@@ -483,7 +508,7 @@ async function extractGeneric(page, urlObj) {
 	}
 
 	// First try direct selector extraction (no LLM) if available
-	const direct = await tryExtractWithVendorSelectors(page, vendor, url, urlObj);
+	const direct = await tryExtractWithVendorSelectors(page, vendor, urlObj, allowedFields);
 
 	// Build dynamic schema for only the fields we need from LLM
 	// Start with base field definitions
@@ -496,15 +521,17 @@ async function extractGeneric(page, urlObj) {
 		weight: z.string().describe('Pack size/weight/volume text if available, e.g., 500g or 2x100ml'),
 		description: z.string().describe('Primary product description or details shown on the page'),
 		category: z.string().describe('Primary product category or breadcrumb category text shown on the page'),
-
+	
 	};
 
 	// Merge with vendor-specific custom fields
 	const vendorCustomFields = getVendorCustomFields(vendor);
-	const fieldDefinitions = { ...baseFieldDefinitions, ...vendorCustomFields };
+	let fieldDefinitions = { ...baseFieldDefinitions, ...vendorCustomFields };
 
 	// Derive all fields from fieldDefinitions to eliminate maintenance errors
-	const allFields = Object.keys(fieldDefinitions);
+	let allFields = Object.keys(fieldDefinitions);
+	// Restrict to update fields in update mode
+	if (allowedFields) allFields = allFields.filter(f => allowedFields.has(f));
 
 	// Define dynamic fields that should always use LLM (never learn selectors)
 	// Note: 'images' is now handled by vendor-specific strategies when available
@@ -552,7 +579,8 @@ async function extractGeneric(page, urlObj) {
 
 	// If all fields are present or recently confirmed unavailable, use direct result
 	if (missingFields.length === 0 && direct && Object.keys(direct).length > 1) {
-		const result = { ...metadata, ...applyImageFallback(direct, urlObj) };
+		const directFiltered = filterObjectKeys(applyImageFallback(direct, urlObj));
+		const result = { ...metadata, ...directFiltered };
 		console.log(`[LEARNING] All fields available from direct extraction, using learned selectors only`);
 		return processProductData(result);
 	}
@@ -569,12 +597,13 @@ async function extractGeneric(page, urlObj) {
 
 	// Determine which fields to extract via LLM
 	let fieldsForLLM = Object.keys(fieldDefinitions);
+	if (allowedFields) fieldsForLLM = fieldsForLLM.filter(f => allowedFields.has(f));
 
 	// Build dynamic instruction including custom vendor fields
 	const baseInstruction = "Extract the product's name, primary image URL, displayed price, all product image URLs, stock status, pack size/weight, category, and a concise description";
 	const vendorCustomFieldNames = Object.keys(getVendorCustomFields(vendor));
 	let instruction = baseInstruction;
-
+	
 	if (vendorCustomFieldNames.length > 0) {
 		const customDescriptions = vendorCustomFieldNames.map(field => {
 			const fieldDef = fieldDefinitions[field];
@@ -602,7 +631,6 @@ async function extractGeneric(page, urlObj) {
 				case 'weight': return 'pack size/weight';
 				case 'description': return 'description';
 				case 'category': return 'category';
-
 				default:
 					// For custom vendor fields, try to extract description from Zod schema
 					const fieldDef = fieldDefinitions[field];
@@ -617,7 +645,6 @@ async function extractGeneric(page, urlObj) {
 		instruction = `Extract only the following product information: ${fieldNames.join(', ')}.`;
 	}
  
-
 	// Build dynamic schema with only needed fields
 	const schemaFields = {};
 	for (const field of fieldsForLLM) {
@@ -636,7 +663,8 @@ async function extractGeneric(page, urlObj) {
 
 	// Create defaults based on field definitions to maintain consistency
 	const extractedDefaults = {};
-	for (const field of allFields) {
+	for (const field of Object.keys(fieldDefinitions)) {
+		if (allowedFields && !allowedFields.has(field)) continue;
 		const fieldDef = fieldDefinitions[field];
 		if (fieldDef && fieldDef._def && fieldDef._def.typeName === 'ZodArray') {
 			extractedDefaults[field] = [];
@@ -648,13 +676,14 @@ async function extractGeneric(page, urlObj) {
 	// Merge extracted data with defaults
 	const normalizedData = { ...extractedDefaults, ...extractedData };
 
-	// Extract base fields
+	// Extract base fields (respect allowedFields subset)
 	const { name, main_image, images, price, stock_status, weight, description, category } = normalizedData;
 
 	// Extract all custom fields dynamically
 	const customFieldData = {};
 	const extractedCustomFieldNames = Object.keys(getVendorCustomFields(vendor));
 	for (const fieldName of extractedCustomFieldNames) {
+		if (allowedFields && !allowedFields.has(fieldName)) continue;
 		if (normalizedData[fieldName] !== undefined) {
 			customFieldData[fieldName] = normalizedData[fieldName];
 		}
@@ -664,52 +693,54 @@ async function extractGeneric(page, urlObj) {
 	// Normalize and validate image URLs
 	// Handle case where LLM returns element IDs instead of URLs for images array
 	let imagesList = [];
-	if (Array.isArray(images)) {
-		// Filter out element IDs and non-URL strings, then clean/validate URLs
-		imagesList = images
-			.filter(img => typeof img === 'string' && img.trim() !== '')
-			.map(cleanAndValidateUrl) // Clean and validate URLs (handles @ prefixes)
-			.filter(Boolean); // Keep only valid URLs
+	if (!allowedFields || allowedFields.has('images')) {
+		if (Array.isArray(images)) {
+			// Filter out element IDs and non-URL strings, then clean/validate URLs
+			imagesList = images
+				.filter(img => typeof img === 'string' && img.trim() !== '')
+				.map(cleanAndValidateUrl) // Clean and validate URLs (handles @ prefixes)
+				.filter(Boolean); // Keep only valid URLs
+		}
 	}
 
-	let mainImage = cleanAndValidateUrl(main_image) || '';
+	let mainImage = (!allowedFields || allowedFields.has('main_image')) ? (cleanAndValidateUrl(main_image) || '') : '';
 	if (!mainImage && imagesList.length > 0) {
 		mainImage = imagesList[0];
 	}
 	// Ensure list includes mainImage and contains only valid, unique URLs
-	if (mainImage) imagesList.unshift(mainImage);
+	if (mainImage && (!allowedFields || allowedFields.has('images'))) imagesList.unshift(mainImage);
 	imagesList = Array.from(new Set(imagesList.filter(Boolean)));
 
 	// Create LLM extracted product data (including custom fields)
-	const llmProduct = { 
-		name,
-		main_image: mainImage,
-		images: imagesList,
-		price,
-		stock_status,
-		weight,
-		description,
-		category,
+	let llmProduct = { 
+		...(allowedFields && !allowedFields.has('name') ? {} : { name }),
+		...(allowedFields && !allowedFields.has('main_image') ? {} : { main_image: mainImage }),
+		...(allowedFields && !allowedFields.has('images') ? {} : { images: imagesList }),
+		...(allowedFields && !allowedFields.has('price') ? {} : { price }),
+		...(allowedFields && !allowedFields.has('stock_status') ? {} : { stock_status }),
+		...(allowedFields && !allowedFields.has('weight') ? {} : { weight }),
+		...(allowedFields && !allowedFields.has('description') ? {} : { description }),
+		...(allowedFields && !allowedFields.has('category') ? {} : { category }),
 		...customFieldData  // Include any custom vendor fields
 	};
+	if (allowedFields) llmProduct = filterObjectKeys(llmProduct);
 
 	// Merge direct extraction results with LLM results (prioritize direct when available)
 	let finalProduct = llmProduct;
 	if (direct) {
 		finalProduct = {
 			...llmProduct, // Start with LLM results as base
-			...direct,     // Overlay direct results (they take priority when present)
+			...filterObjectKeys(direct),     // Overlay direct results (filtered to allowed fields)
 			// Use direct result for main_image if available, otherwise use LLM result
-			main_image: direct.main_image || mainImage,
+			...(allowedFields && !allowedFields.has('main_image') ? {} : { main_image: (direct.main_image || mainImage) }),
 			// Use direct result for images if available and not empty, otherwise use LLM result
-			images: (direct.images && Array.isArray(direct.images) && direct.images.length > 0) ? direct.images : imagesList,
+			...(allowedFields && !allowedFields.has('images') ? {} : { images: (direct.images && Array.isArray(direct.images) && direct.images.length > 0) ? direct.images : imagesList }),
 			 
 		};
 
 	}
 
 	const result = { ...metadata, ...finalProduct };
-
 	// Apply image fallback if urlObj is provided (from sitemap data)
 	let finalResult = applyImageFallback(result, urlObj);
 	
@@ -747,6 +778,7 @@ async function extractGeneric(page, urlObj) {
 		// Full extraction - report fields defined in fieldDefinitions that have values
 		const extractableFields = Object.keys(fieldDefinitions).filter(field => !dynamicFields.includes(field));
 		const fieldsWithValues = extractableFields.filter(field => {
+			if (allowedFields && !allowedFields.has(field)) return false;
 			const value = finalResult[field];
 			return value && (typeof value !== 'string' || value.trim() !== '');
 		});

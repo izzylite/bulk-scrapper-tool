@@ -39,6 +39,19 @@ function ensureVendorDirectoryExists(vendor) {
 }
 
 /**
+ * Ensure vendor updates directory exists: scrapper/output/<vendor>/updates
+ */
+function ensureVendorUpdatesDirectoryExists(vendor) {
+    const vendorDir = ensureVendorDirectoryExists(vendor);
+    const updatesDir = path.join(vendorDir, 'updates');
+    if (!fs.existsSync(updatesDir)) {
+        fs.mkdirSync(updatesDir, { recursive: true });
+        console.log(`[OUTPUT-MANAGER] Created updates directory: ${updatesDir}`);
+    }
+    return updatesDir;
+}
+
+/**
  * Generates output filename based on input filename with .output suffix
  * @param {string} inputFileName - Original input file name
  * @param {number} index - Optional index for file rotation (default: no index)
@@ -56,6 +69,20 @@ function generateOutputFileName(inputFileName, index = null) {
     }
     
     return `${baseName}.output.json`;
+}
+
+/**
+ * Generate update file name using .update suffix
+ */
+function generateUpdateFileName(inputFileName, index = null) {
+    if (!inputFileName) {
+        throw new Error('[OUTPUT-MANAGER] Input filename is required');
+    }
+    const baseName = path.basename(inputFileName, path.extname(inputFileName));
+    if (index !== null && index >= 0) {
+        return `${baseName}.update_${index}.json`;
+    }
+    return `${baseName}.update.json`;
 }
 
 /**
@@ -150,6 +177,39 @@ function findCurrentOutputFile(vendorDir, inputFileName) {
 }
 
 /**
+ * Find current update file in updates directory
+ */
+function findCurrentUpdateFile(updatesDir, inputFileName) {
+    try {
+        const baseName = path.basename(inputFileName, path.extname(inputFileName));
+        const files = fs.readdirSync(updatesDir);
+        const updateFiles = files
+            .filter(file => file === `${baseName}.update.json` || (/^.*\.update_\d+\.json$/.test(file) && file.startsWith(baseName)))
+            .map(file => {
+                const filePath = path.join(updatesDir, file);
+                let index = null;
+                const indexMatch = file.match(/\.update_(\d+)\.json$/);
+                if (indexMatch) index = parseInt(indexMatch[1], 10);
+                else if (file.endsWith('.update.json')) index = 0;
+                let itemCount = 0;
+                try {
+                    if (fs.existsSync(filePath)) {
+                        const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+                        itemCount = data.total_items || 0;
+                    }
+                } catch { itemCount = 0; }
+                return { filePath, index, itemCount, fileName: file };
+            })
+            .sort((a, b) => b.index - a.index);
+        return updateFiles.length > 0 ? updateFiles[0] : null;
+    } catch (err) {
+        console.warn(`[OUTPUT-MANAGER] Failed to find current update file:`, err.message);
+        logWarning('update_file_find_failed', { error: err.message });
+        return null;
+    }
+}
+
+/**
  * Gets the next available index for a new output file
  * @param {string} vendorDir - Vendor directory path
  * @param {string} inputFileName - Original input file name
@@ -159,9 +219,14 @@ function getNextOutputFileIndex(vendorDir, inputFileName) {
     const currentFile = findCurrentOutputFile(vendorDir, inputFileName);
     return currentFile ? currentFile.index + 1 : 0;
 }
- 
- 
 
+/** Get next index for updates files */
+function getNextUpdateFileIndex(updatesDir, inputFileName) {
+    const currentFile = findCurrentUpdateFile(updatesDir, inputFileName);
+    return currentFile ? currentFile.index + 1 : 0;
+}
+ 
+ 
 /**
  * Validates if an item should be kept (not filtered out)
  * Filters out items that have empty price AND "In stock" status
@@ -192,6 +257,8 @@ function isValidProduct(item) {
 
 /**
  * Converts string prices to numbers for valid products
+ * - Strips currency symbols and separators
+ * - Normalizes price_history entries
  * @param {Array} products - Array of products to process
  * @returns {Array} Products with numeric price fields
  */
@@ -199,19 +266,40 @@ function convertPricesToNumbers(products) {
     if (!Array.isArray(products)) {
         return products;
     }
+
+    const toNumber = (val) => {
+        if (typeof val === 'number') return val;
+        if (typeof val === 'string') {
+            const cleaned = val.replace(/[^0-9.\-]/g, '');
+            const n = parseFloat(cleaned);
+            if (!isNaN(n)) return n;
+        }
+        return val;
+    };
     
     products.forEach(product => {
-        if (product.price && typeof product.price === 'string') {
-            const numericPrice = parseFloat(product.price);
-            if (!isNaN(numericPrice)) {
-                product.price = numericPrice;
-            }
+        if (product.price !== undefined) {
+            const numericPrice = toNumber(product.price);
+            if (typeof numericPrice === 'number') product.price = numericPrice;
         }
-        if (product.original_price && typeof product.original_price === 'string') {
-            const numericOriginalPrice = parseFloat(product.original_price);
-            if (!isNaN(numericOriginalPrice)) {
-                product.original_price = numericOriginalPrice;
-            }
+        if (product.original_price !== undefined) {
+            const numericOriginalPrice = toNumber(product.original_price);
+            if (typeof numericOriginalPrice === 'number') product.original_price = numericOriginalPrice;
+        }
+        // Normalize price_history if present
+        if (Array.isArray(product.price_history)) {
+            product.price_history = product.price_history.map(entry => {
+                const next = { ...entry };
+                if (next.old !== undefined) {
+                    const v = toNumber(next.old);
+                    if (typeof v === 'number') next.old = v;
+                }
+                if (next.new !== undefined) {
+                    const v = toNumber(next.new);
+                    if (typeof v === 'number') next.new = v;
+                }
+                return next;
+            });
         }
     });
     
@@ -242,8 +330,6 @@ async function appendItemsToOutputFile(outputFilePath, successfulItems, metadata
     if (filteredCount > 0) {
         console.log(`[OUTPUT-MANAGER] Filtered out ${filteredCount} items without valid prices (${validProducts.length}/${originalCount} items remain)`);
     }
-    
-   
     
     const MAX_ITEMS_PER_FILE = 10000;
     
@@ -313,7 +399,6 @@ async function appendItemsToOutputFile(outputFilePath, successfulItems, metadata
         try {
             fs.writeFileSync(targetFilePath, JSON.stringify(outputData, null, 2), 'utf8');
             
-            const indexSuffix = targetIndex !== null && targetIndex > 0 ? `_${targetIndex}` : '';
             console.log(`[OUTPUT-MANAGER] Appended ${validProducts.length} items with valid prices to ${path.basename(targetFilePath)} (${outputData.total_items} total)${filteredCount > 0 ? ` [${filteredCount} items filtered out, ${outputData.filtered_invalid_count} total filtered out]` : ''}`);
             
             return {
@@ -328,6 +413,91 @@ async function appendItemsToOutputFile(outputFilePath, successfulItems, metadata
         } catch (err) {
             console.error(`[OUTPUT-MANAGER] Failed to write output file:`, err.message);
             logError('output_file_write_failed', { filePath: targetFilePath, error: err.message });
+            throw err;
+        }
+    });
+}
+
+/** Append items to updates file with rotation inside updates/ */
+async function appendItemsToUpdateFile(updateFilePath, snapshots, metadata = {}) {
+    if (!Array.isArray(snapshots) || snapshots.length === 0) {
+        console.log('[OUTPUT-MANAGER] No items to append to updates');
+        return { appended: 0, total: 0, filePath: updateFilePath, filtered: 0, totalFiltered: 0 };
+    }
+
+    // Filter and normalize prices
+    const originalCount = snapshots.length;
+    let validProducts = snapshots.filter(isValidProduct);
+    const filteredCount = originalCount - validProducts.length;
+    validProducts = convertPricesToNumbers(validProducts);
+
+    if (filteredCount > 0) {
+        console.log(`[OUTPUT-MANAGER] Filtered out ${filteredCount} update items without valid prices (${validProducts.length}/${originalCount} remain)`);
+    }
+
+    const MAX_ITEMS_PER_FILE = 10000;
+
+    const updatesDir = path.dirname(updateFilePath);
+
+    // Determine input filename for naming
+    let inputFileName = metadata.inputFileName;
+    if (!inputFileName) {
+        const outputFileName = path.basename(updateFilePath);
+        const match = outputFileName.match(/^(.+)\.update(?:_\d+)?\.json$/);
+        inputFileName = match ? `${match[1]}.json` : outputFileName;
+    }
+
+    return withFileLock(updateFilePath, () => {
+        let currentFile = findCurrentUpdateFile(updatesDir, inputFileName);
+        let targetFilePath = updateFilePath;
+        let targetIndex = null;
+
+        if (currentFile) {
+            const wouldExceedLimit = (currentFile.itemCount + validProducts.length) > MAX_ITEMS_PER_FILE;
+            if (wouldExceedLimit) {
+                const nextIndex = getNextUpdateFileIndex(updatesDir, inputFileName);
+                const newFileName = generateUpdateFileName(inputFileName, nextIndex);
+                targetFilePath = path.join(updatesDir, newFileName);
+                targetIndex = nextIndex;
+                console.log(`[OUTPUT-MANAGER] Update file rotation: ${currentFile.fileName} (${currentFile.itemCount} items) → ${newFileName}`);
+            } else {
+                targetFilePath = currentFile.filePath;
+                targetIndex = currentFile.index;
+            }
+        }
+
+        let outputData = readExistingOutputFile(targetFilePath);
+        if (!outputData) {
+            outputData = createBaseOutputStructure(
+                metadata.vendor || path.basename(path.dirname(updatesDir)),
+                metadata.sourceFile || 'unknown'
+            );
+        }
+
+        if (typeof outputData.filtered_invalid_count === 'undefined') {
+            outputData.filtered_invalid_count = 0;
+        }
+        if (!Array.isArray(outputData.items)) outputData.items = [];
+        outputData.items.push(...validProducts);
+        outputData.total_items = outputData.items.length;
+        outputData.filtered_invalid_count += filteredCount;
+        outputData.updated_at = new Date().toISOString();
+
+        try {
+            fs.writeFileSync(targetFilePath, JSON.stringify(outputData, null, 2), 'utf8');
+            console.log(`[OUTPUT-MANAGER] Appended ${validProducts.length} updated snapshots to ${path.basename(targetFilePath)} (${outputData.total_items} total)`);
+            return {
+                appended: validProducts.length,
+                total: outputData.total_items,
+                filePath: targetFilePath,
+                index: targetIndex,
+                rotated: targetFilePath !== updateFilePath,
+                filtered: filteredCount,
+                totalFiltered: outputData.filtered_invalid_count
+            };
+        } catch (err) {
+            console.error(`[OUTPUT-MANAGER] Failed to write update file:`, err.message);
+            logError('update_file_write_failed', { filePath: targetFilePath, error: err.message });
             throw err;
         }
     });
@@ -363,6 +533,31 @@ function createOutputFile(vendor, sourceFile, inputFileName) {
     } catch (err) {
         console.error(`[OUTPUT-MANAGER] Failed to create output file:`, err.message);
         logError('output_file_create_failed', { outputFilePath, error: err.message });
+        throw err;
+    }
+}
+
+/** Create or return existing update output file in updates/ */
+function createUpdateOutputFile(vendor, sourceFile, inputFileName) {
+    const updatesDir = ensureVendorUpdatesDirectoryExists(vendor);
+
+    const current = findCurrentUpdateFile(updatesDir, inputFileName);
+    if (current && fs.existsSync(current.filePath)) {
+        console.log(`[OUTPUT-MANAGER] Using existing update file: ${current.fileName} for vendor: ${vendor} (${current.itemCount} items)`);
+        return current.filePath;
+    }
+
+    const fileName = generateUpdateFileName(inputFileName);
+    const updateFilePath = path.join(updatesDir, fileName);
+    const initialData = createBaseOutputStructure(vendor, sourceFile);
+
+    try {
+        fs.writeFileSync(updateFilePath, JSON.stringify(initialData, null, 2), 'utf8');
+        console.log(`[OUTPUT-MANAGER] Created update file: ${fileName} in updates directory for vendor: ${vendor}`);
+        return updateFilePath;
+    } catch (err) {
+        console.error(`[OUTPUT-MANAGER] Failed to create update file:`, err.message);
+        logError('update_file_create_failed', { updateFilePath, error: err.message });
         throw err;
     }
 }
@@ -465,13 +660,19 @@ function getVendorSummary(vendor) {
 
 module.exports = {
     ensureVendorDirectoryExists,
+    ensureVendorUpdatesDirectoryExists,
     createOutputFile,
+    createUpdateOutputFile,
     appendItemsToOutputFile,
+    appendItemsToUpdateFile,
     getLatestOutputFile,
     getVendorSummary,
     generateOutputFileName,
+    generateUpdateFileName,
     findCurrentOutputFile,
+    findCurrentUpdateFile,
     getNextOutputFileIndex,
+    getNextUpdateFileIndex,
     hasValidPrice: isValidProduct,
     convertPricesToNumbers,
     OUTPUT_DIR

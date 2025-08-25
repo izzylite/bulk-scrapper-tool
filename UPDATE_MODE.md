@@ -204,3 +204,140 @@ node stagehand_product_extractor.js --update --vendor=superdrug
 ### Notes
 - The current codebase does not use variant-specific keys; updates operate at product level using `update_key`.
 - A future optional "apply updates" task can upsert `.update.json` back into canonical `.output*.json` if needed.
+
+## Quick Start (TL;DR)
+
+1) Optional vendor config:
+```json
+// scrapper/output/<vendor>/update.json
+{
+  "vendor": "superdrug",
+  "update_key": "sku",
+  "update_fields": ["price", "stock_status"],
+  "stale_days": 1
+}
+```
+
+2) Run update mode:
+```bash
+node stagehand_product_extractor.js --update --vendor=superdrug
+```
+
+3) Limit to explicit fields (overrides update.json):
+```bash
+node stagehand_product_extractor.js --update --vendor=superdrug --update-fields=price,stock_status
+```
+
+4) Inspect results under:
+- `scrapper/output/<vendor>/updates/*.update*.json`
+- Archived processing file in `scrapper/processing/archived/`
+
+---
+
+## CLI Reference (Final)
+
+- `--update`: Enable update mode.
+- `--vendor=<v1[,v2,...]>`: One or more vendors to update.
+- `--update-fields=<f1,f2,...>`: Only refresh these fields (e.g., `price,stock_status,images`). Overrides vendor `update.json`.
+- `--update-key=<key>`: Stable identity key (e.g., `product_id`, `sku`, `url`). Overrides vendor `update.json`.
+- `--stale-days=<n>`: Only update items where `last_checked_at` (or `updated_at`) is older than `n` days.
+
+Notes:
+- If `--update-fields` omitted and no `update.json`, all fields are eligible for refresh.
+- If `--update-key` omitted, fallback order applies: `product_id` → `sku` → `product_url|source_url` → `url`.
+
+---
+
+## Field Filtering Semantics (allowedFields)
+
+Update mode propagates a strict set of allowed fields into the extraction pipeline so only the requested fields are touched:
+
+- The set is derived from CLI `--update-fields` or `update.json` → `update_fields`. If empty/omitted, all fields are allowed.
+- `tools/strategies/generic.js` enforces `allowedFields` throughout extraction:
+  - Direct selector-based extraction: only attempts learned selectors for fields in `allowedFields`.
+  - Vendor strategies (e.g., `superdrug`): any returned fields are filtered by `allowedFields` before merging.
+  - LLM fallback extraction: schema is built only for the missing fields that are in `allowedFields`.
+- Images: if `images` is allowed but `main_image` is not, the system will refresh gallery images without forcing `main_image` (and vice versa). The final merge respects the allowed subset.
+- Snapshot writing: Output manager merges only the fields in `allowedFields` (unless the list is empty, meaning all).
+
+Implications:
+- Precise, minimal deltas: safe to run partial updates like just `price`/`stock_status` without touching `description` or `category`.
+- Faster runs: fewer DOM queries and less I/O when `allowedFields` is narrow.
+
+---
+
+## Processing File Schema (Example)
+```json
+{
+  "active": true,
+  "vendor": "superdrug",
+  "mode": "update",
+  "update_key": "sku",
+  "update_fields": ["price", "stock_status"],
+  "stale_before": "2025-08-24T00:00:00.000Z",
+  "source_files": [
+    "scrapper/output/superdrug/superdrugs_batch_1.json",
+    "scrapper/output/superdrug/superdrug_batch_2.json"
+  ],
+  "items": [
+    { "url": "https://.../p/123", "vendor": "superdrug", "sku": "ABC-123", "image_url": "https://.../img.jpg" }
+  ]
+}
+```
+
+---
+
+## Update Output Snapshot (Example)
+```json
+{
+  "sku": "ABC-123",
+  "name": "Product Name",
+  "price": "£12.99",
+  "stock_status": "In stock",
+  "main_image": "https://.../main.jpg",
+  "images": ["https://.../main.jpg", "https://.../alt1.jpg"],
+  "last_checked_at": "2025-08-25T01:04:00.000Z",
+  "price_history": [
+    { "old": "£13.49", "new": "£12.99", "changed_at": "2025-08-25T01:04:00.000Z" }
+  ],
+  "stock_history": []
+}
+```
+
+---
+
+## Examples
+
+- Update only price and stock, skip items checked in last 1 day:
+```bash
+node stagehand_product_extractor.js --update --vendor=superdrug --update-fields=price,stock_status --stale-days=1
+```
+
+- Update all fields for multiple vendors:
+```bash
+node stagehand_product_extractor.js --update --vendor=superdrug,harrods
+```
+
+- Force identity by URL when SKU is unreliable:
+```bash
+node stagehand_product_extractor.js --update --vendor=superdrug --update-key=url
+```
+
+---
+
+## Troubleshooting
+
+- No items produced:
+  - Check `--vendor` name matches the folder under `scrapper/output/`.
+  - If `--stale-days` is set, verify items have `last_checked_at`/`updated_at` older than the threshold.
+- Fields not updating:
+  - Ensure the field is included in `--update-fields` or vendor `update.json`.
+  - Confirm the site still exposes the data; inspect logs for selector misses or LLM fallback usage.
+- Update outputs too large:
+  - Rotation is automatic at 10,000 records per file under `updates/`. Consider narrower `--update-fields` or staleness filters.
+- Mixed images behavior:
+  - If only `images` is allowed, the gallery refreshes; `main_image` stays unchanged unless allowed or provided by vendor strategy.
+
+---
+
+This document reflects the implemented behavior in the current codebase, including strict field filtering in `tools/strategies/generic.js` and the update-mode file rotation strategy in the output manager.
