@@ -191,6 +191,34 @@ function isValidProduct(item) {
 }
 
 /**
+ * Converts string prices to numbers for valid products
+ * @param {Array} products - Array of products to process
+ * @returns {Array} Products with numeric price fields
+ */
+function convertPricesToNumbers(products) {
+    if (!Array.isArray(products)) {
+        return products;
+    }
+    
+    products.forEach(product => {
+        if (product.price && typeof product.price === 'string') {
+            const numericPrice = parseFloat(product.price);
+            if (!isNaN(numericPrice)) {
+                product.price = numericPrice;
+            }
+        }
+        if (product.original_price && typeof product.original_price === 'string') {
+            const numericOriginalPrice = parseFloat(product.original_price);
+            if (!isNaN(numericOriginalPrice)) {
+                product.original_price = numericOriginalPrice;
+            }
+        }
+    });
+    
+    return products;
+}
+
+/**
  * Appends items to an output file (only successful items with valid prices) with automatic file rotation
  * @param {string} outputFilePath - Path to output file
  * @param {Array} items - Items to append
@@ -205,8 +233,11 @@ async function appendItemsToOutputFile(outputFilePath, successfulItems, metadata
     
     // Filter items to only include those with valid prices
     const originalCount = successfulItems.length;
-    const validProducts = successfulItems.filter(isValidProduct);
+    let validProducts = successfulItems.filter(isValidProduct);
     const filteredCount = originalCount - validProducts.length;
+    
+    // Convert price fields to numbers for valid products
+    validProducts = convertPricesToNumbers(validProducts);
     
     if (filteredCount > 0) {
         console.log(`[OUTPUT-MANAGER] Filtered out ${filteredCount} items without valid prices (${validProducts.length}/${originalCount} items remain)`);
@@ -442,5 +473,6 @@ module.exports = {
     findCurrentOutputFile,
     getNextOutputFileIndex,
     hasValidPrice: isValidProduct,
+    convertPricesToNumbers,
     OUTPUT_DIR
 };

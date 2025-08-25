@@ -475,11 +475,7 @@ async function processBucket(workerSessionManager, objectsSubset) {
                         mainProduct = extractedItem;
                     } else {
                         variantExtractions.push({
-                            ...extractedItem,
-                            variant_url: currentUrl.url,
-                            variant_sku: currentUrl.sku,
-                            variant_image: currentUrl.image_url,
-                            is_variant: true
+                            ...extractedItem,  
                         });
                     }
                 }
@@ -489,8 +485,7 @@ async function processBucket(workerSessionManager, objectsSubset) {
                     item = {
                         ...mainProduct,
                         variants: variantExtractions,
-                        variant_count: variantExtractions.length,
-                        extracted_variants: true
+                        variant_count: variantExtractions.length
                     };
 
                     workerSessionManager.addItemToBuffer(item);

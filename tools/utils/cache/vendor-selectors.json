@@ -9,7 +9,7 @@
         "weight",
         "description",
         "category",
-        "discount",
+
         "marketplace",
         "main_image",
         "images"
@@ -39,10 +39,7 @@
           "found": true,
           "value_type": "string"
         },
-        "discount": {
-          "found": false,
-          "value_type": "string"
-        },
+
         "marketplace": {
           "found": false,
           "value_type": "boolean"
@@ -158,32 +155,6 @@
           "learned_at": "2025-08-22T10:41:52.993Z",
           "success_count": 10,
           "last_success": "2025-08-22T10:43:28.314Z"
-        }
-      ],
-      "discount": [
-        {
-          "selector": "xpath=/html[1]/body[1]/app-root[1]/cx-storefront[1]/header[1]/cx-page-layout[2]/cx-page-slot[1]/e2-paragraph-carousel[1]/section[1]/div[1]/e2-carousel[1]/div[1]/div[1]/swiper[1]/div[1]/div[4]/e2-paragraph[1]/div[1]/a[1]",
-          "learned_at": "2025-08-22T19:02:03.672Z",
-          "success_count": 10,
-          "last_success": "2025-08-22T19:02:49.496Z"
-        },
-        {
-          "selector": "xpath=/html[1]/body[1]/app-root[1]/cx-storefront[1]/header[1]/cx-page-layout[2]/cx-page-slot[1]/e2-paragraph-carousel[1]/section[1]/div[1]/e2-carousel[1]/div[1]/div[1]/swiper[1]/div[1]/div[3]/e2-paragraph[1]/div[1]/a[1]",
-          "learned_at": "2025-08-22T18:56:15.265Z",
-          "success_count": 10,
-          "last_success": "2025-08-22T18:56:34.539Z"
-        },
-        {
-          "selector": "xpath=/html[1]/body[1]/app-root[1]/cx-storefront[1]/main[1]/cx-page-layout[1]/e2-product-outlets[1]/div[1]/section[1]/cx-page-layout[1]/cx-page-slot[1]/mp-product-add-to-cart[1]/e2-product-add-to-cart[1]/div[2]/e2-promotion[1]/div[1]/span[2]",
-          "learned_at": "2025-08-22T14:21:40.358Z",
-          "success_count": 10,
-          "last_success": "2025-08-22T17:02:35.750Z"
-        },
-        {
-          "selector": "xpath=/html[1]/body[1]/app-root[1]/cx-storefront[1]/header[1]/cx-page-layout[2]/cx-page-slot[1]/e2-paragraph-carousel[1]/section[1]/div[1]/e2-carousel[1]/div[1]/div[1]/swiper[1]/div[1]/div[2]/e2-paragraph[1]/div[1]/a[1]",
-          "learned_at": "2025-08-22T14:21:46.137Z",
-          "success_count": 10,
-          "last_success": "2025-08-22T14:22:02.810Z"
         }
       ]
     }

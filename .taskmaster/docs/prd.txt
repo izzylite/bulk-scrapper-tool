@@ -1,0 +1,45 @@
+Title: Scrapper Update Mode (Vendor Updates via updates/)
+
+Overview:
+We need an update mode for the Stagehand scrapper to refresh existing products for specific vendors. The update mode will deactivate any active processing file, scan vendor output JSON files to build a baseline, generate a new processing job with update metadata, and emit full updated snapshots to scrapper/output/<vendor>/updates/*.update*.json. Normal runs remain unchanged.
+
+Goals:
+- Add CLI flags: --update, --vendor (plus optional --update-fields, --update-key, --stale-days).
+- Deactivate active processing file(s) in update mode.
+- Create baseline index from vendor outputs to determine items to re-scrape (support staleness filter).
+- Produce processing file with mode:"update" and metadata (update_key, update_fields, stale_before).
+- Append full updated snapshots to updates/ files with rotation (10k per file), preserving history of price/stock changes.
+- Keep error handling, success removals, and archival behavior consistent with current flow.
+
+Non-Goals:
+- Mutating historical output files during the update run.
+- Variant-specific handling (variant_* keys are not used in the current codebase).
+
+User Stories:
+1) As an operator, I can run the scraper in update mode for vendor(s) to refresh selected fields without duplicating items or overwriting historical outputs.
+2) As a consumer, I can read updates/*.update*.json and get a full, updated snapshot per product, including field changes and timestamps.
+3) As a developer, I can control which fields to update via scrapper/output/<vendor>/update.json or CLI overrides.
+
+Functional Requirements:
+- CLI: --update, --vendor=<vendors[,..]>; optional --update-fields, --update-key, --stale-days.
+- update.json: { vendor, update_key?, update_fields?, stale_days?, merge_strategy? }
+- Baseline builder: BaselineIndex scanning vendor outputs (*.json), dedupe by identity, prefer newest updated_at, optional staleness filter, exclude updates/ files.
+- Processing file: include mode:"update", update_key, update_fields, stale_before, source_files, items[] (url, vendor, image_url?, sku?).
+- Output manager (update mode): write full snapshots to scrapper/output/<vendor>/updates/<base>.update[_N].json with rotation; track filtered/updated/inserted counts.
+- Change tracking: record price_history, stock_history; set last_checked_at.
+- Pending manager: allow extra fields in update processing file (validation), normal removal/archival.
+- Input manager: helper to write processing files from in-memory items+metadata.
+
+Constraints:
+- Large vendor files (hundreds of thousands of items) must be handled with streaming and lightweight indexes.
+- Memory footprint should be controlled; prefer BaselineIndex.
+- Backward compatibility with non-update mode.
+
+Acceptance Criteria:
+- Running `node stagehand_product_extractor.js --update --vendor=superdrug` produces a new processing file and outputs updated snapshots under scrapper/output/superdrug/updates/.
+- Updates contain full snapshots with refreshed fields and history; rotation respected at 10k per file.
+- No mutations to existing historical output files during the run.
+- Success removal and error logging work as in normal mode.
+
+Out of Scope:
+- Applying updates back into canonical output files (can be a future task).

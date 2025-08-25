@@ -1,0 +1,139 @@
+{
+  "master": {
+    "tasks": [
+      {
+        "id": 1,
+        "title": "Implement CLI Flags for Update Mode",
+        "description": "Add new CLI flags to support update mode and vendor selection, including optional update fields, update key, and staleness filter.",
+        "details": "Extend the CLI parser to recognize --update, --vendor, --update-fields, --update-key, and --stale-days. Ensure these flags are validated and passed to the main execution logic. Update help documentation to reflect new options.",
+        "testStrategy": "Unit test CLI parsing with various flag combinations. Verify correct values are parsed and errors are raised for invalid input.",
+        "priority": "high",
+        "dependencies": [],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 2,
+        "title": "Deactivate Active Processing Files in Update Mode",
+        "description": "Ensure that when update mode is triggered, any active processing files for the selected vendor(s) are deactivated to prevent conflicts.",
+        "details": "On entering update mode, scan scrapper/output/<vendor>/ for active processing files. Mark them as inactive (e.g., by renaming or updating status in metadata) before proceeding.",
+        "testStrategy": "Integration test: Start with an active processing file, run update mode, and verify the file is deactivated and not used in the update run.",
+        "priority": "high",
+        "dependencies": [
+          1
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 3,
+        "title": "Build Baseline Index from Vendor Output Files",
+        "description": "Scan vendor output JSON files to build a deduplicated baseline index, supporting staleness filtering and excluding updates/ files.",
+        "details": "Implement BaselineIndex that streams through all scrapper/output/<vendor>/*.json (excluding updates/), dedupes by identity (e.g., SKU or URL), prefers newest updated_at, and applies staleness filter if specified. Use streaming to minimize memory usage.",
+        "testStrategy": "Unit and integration tests: Feed large sets of vendor files, verify deduplication, staleness filtering, and exclusion of updates/ files. Check memory usage under load.",
+        "priority": "high",
+        "dependencies": [
+          2
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 4,
+        "title": "Generate Update Processing File with Metadata",
+        "description": "Produce a processing file containing mode:'update', update metadata, and items to be updated.",
+        "details": "From the BaselineIndex, generate a processing file (JSON) with required metadata: mode, update_key, update_fields, stale_before, source_files, and items[]. Each item should include url, vendor, and optional image_url/sku. Allow extra fields for future extensibility.",
+        "testStrategy": "Unit test: Validate structure and content of generated processing file. Check for correct metadata and item inclusion.",
+        "priority": "high",
+        "dependencies": [
+          3
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 5,
+        "title": "Implement Update Mode Output Manager with File Rotation",
+        "description": "Write full updated product snapshots to updates/ files, rotating at 10,000 items per file and preserving history.",
+        "details": "Implement output logic to write to scrapper/output/<vendor>/updates/<base>.update[_N].json. Rotate files after 10,000 items. Ensure each snapshot includes all required fields and preserves historical price/stock changes. Track filtered/updated/inserted counts.",
+        "testStrategy": "Integration test: Run update mode with >10,000 items, verify correct file rotation, snapshot completeness, and count tracking.",
+        "priority": "high",
+        "dependencies": [
+          4
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 6,
+        "title": "Track and Record Change History for Price and Stock",
+        "description": "Maintain price_history and stock_history fields for each product, updating last_checked_at on each run.",
+        "details": "On each update, append new price and stock values to their respective history arrays, and set last_checked_at to the current timestamp. Ensure history is preserved across updates.",
+        "testStrategy": "Unit test: Simulate multiple updates for a product, verify correct history tracking and timestamp updates.",
+        "priority": "medium",
+        "dependencies": [
+          5
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 7,
+        "title": "Ensure Backward Compatibility with Normal Mode",
+        "description": "Maintain existing behavior for non-update runs, ensuring update mode changes do not affect normal processing.",
+        "details": "Refactor code to isolate update mode logic. Add checks to ensure normal runs are unaffected by new flags and processing logic. Update documentation to clarify mode differences.",
+        "testStrategy": "Regression test: Run normal mode before and after changes, verify outputs and side effects are unchanged.",
+        "priority": "high",
+        "dependencies": [
+          6
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 8,
+        "title": "Integrate Error Handling and Success Removal Consistency",
+        "description": "Ensure error logging, success removals, and archival behavior in update mode match the current flow.",
+        "details": "Reuse or extend existing error handling and archival modules. On update runs, log errors and remove successful items as in normal mode. Validate that archival policies are respected.",
+        "testStrategy": "Integration test: Inject errors and successful updates, verify logs, removals, and archival actions are consistent with normal mode.",
+        "priority": "medium",
+        "dependencies": [
+          7
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 9,
+        "title": "Validate and Allow Extra Fields in Update Processing Files",
+        "description": "Permit extra fields in update processing files for future extensibility, while validating required fields.",
+        "details": "Update processing file schema validation to accept extra fields beyond the required set. Ensure that required fields are always present and correctly typed.",
+        "testStrategy": "Unit test: Generate processing files with extra fields, verify validation passes and required fields are enforced.",
+        "priority": "medium",
+        "dependencies": [
+          8
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 10,
+        "title": "Document Update Mode Usage and Developer Controls",
+        "description": "Update project documentation to describe update mode, CLI flags, processing file structure, and developer override options.",
+        "details": "Write or update README and inline docs to cover new CLI flags, update.json structure, processing file format, and how to control update fields via CLI or file. Include usage examples and troubleshooting tips.",
+        "testStrategy": "Manual review: Verify documentation accuracy and completeness. Test by following docs to run update mode.",
+        "priority": "medium",
+        "dependencies": [
+          9
+        ],
+        "status": "pending",
+        "subtasks": []
+      }
+    ],
+    "metadata": {
+      "created": "2025-08-25T00:22:28.710Z",
+      "updated": "2025-08-25T00:22:28.710Z",
+      "description": "Tasks for master context"
+    }
+  }
+}

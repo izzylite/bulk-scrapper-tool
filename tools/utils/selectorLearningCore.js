@@ -199,7 +199,7 @@ async function learnAndCacheSelectors(page, vendor, item) {
     const learned = {};
     // Learn selectors for static fields, main_image, and stock_status (which often has consistent patterns)
     // Truly dynamic fields (images array) will always use LLM
-    const baseFieldsToLearn = ['name', 'price', 'main_image', 'weight', 'description', 'category', 'discount', 'stock_status'];
+    const baseFieldsToLearn = ['name', 'price', 'main_image', 'weight', 'description', 'category', 'stock_status'];
     
     // Add custom vendor fields that are suitable for selector learning (non-dynamic fields)
     const customFieldNames = Object.keys(getVendorCustomFields(vendor));
