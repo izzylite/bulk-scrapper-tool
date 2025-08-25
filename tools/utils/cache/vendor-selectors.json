@@ -1,7 +1,7 @@
 {
   "superdrug": {
     "last_llm_extraction": {
-      "timestamp": "2025-08-25T09:21:47.101Z",
+      "timestamp": "2025-08-25T22:19:14.623Z",
       "attempted_fields": [
         "name",
         "price",
@@ -13,7 +13,10 @@
         "main_image",
         "images",
         "breadcrumbs",
-        "features"
+        "features",
+        "product_specification",
+        "height",
+        "length"
       ],
       "results": {
         "name": {
@@ -57,7 +60,19 @@
           "value_type": "array"
         },
         "features": {
-          "found": true,
+          "found": false,
+          "value_type": "string"
+        },
+        "product_specification": {
+          "found": false,
+          "value_type": "string"
+        },
+        "height": {
+          "found": false,
+          "value_type": "string"
+        },
+        "length": {
+          "found": false,
           "value_type": "string"
         }
       }
@@ -169,24 +184,50 @@
         {
           "selector": "xpath=/html[1]/body[1]/app-root[1]/cx-storefront[1]/main[1]/cx-page-layout[1]/e2-product-outlets[1]/div[1]/section[1]/e2-product-images-grid[1]/section[1]/e2core-media[1]/img[1]",
           "learned_at": "2025-08-25T08:29:46.045Z",
-          "success_count": 6,
-          "last_success": "2025-08-25T09:21:42.653Z"
-        }
-      ],
-      "breadcrumbs": [
-        {
-          "selector": "xpath=/html[1]/body[1]/app-root[1]/cx-storefront[1]/main[1]/cx-page-layout[1]/e2-product-outlets[1]/cx-page-layout[2]/cx-page-slot[1]/e2-breadcrumb[1]/div[1]",
-          "learned_at": "2025-08-25T08:29:46.045Z",
-          "success_count": 1,
-          "last_success": "2025-08-25T08:29:46.045Z"
+          "success_count": 10,
+          "last_success": "2025-08-25T15:17:48.317Z"
         }
       ],
       "marketplace": [
         {
           "selector": "xpath=/html[1]/body[1]/app-root[1]/cx-storefront[1]/main[1]/cx-page-layout[1]/e2-product-outlets[1]/div[1]/section[1]/cx-page-layout[1]/cx-page-slot[1]/mp-product-add-to-cart[1]/div[1]/div[2]",
           "learned_at": "2025-08-25T08:29:46.045Z",
-          "success_count": 6,
-          "last_success": "2025-08-25T09:21:42.653Z"
+          "success_count": 10,
+          "last_success": "2025-08-25T15:17:48.317Z"
+        }
+      ],
+      "features": [
+        {
+          "selector": "xpath=/html[1]/body[1]/app-root[1]/cx-storefront[1]/main[1]/cx-page-layout[1]/e2-product-outlets[1]/div[1]/cx-page-layout[1]/cx-page-slot[1]/e2-product-details-section[1]/section[1]/e2-accordion[1]/div[1]/div[2]/div[1]/p[1]",
+          "learned_at": "2025-08-25T15:18:00.612Z",
+          "success_count": 10,
+          "last_success": "2025-08-25T15:18:34.815Z"
+        }
+      ],
+      "breadcrumbs": [
+        {
+          "selector": "xpath=/html[1]/body[1]/app-root[1]/cx-storefront[1]/main[1]/cx-page-layout[1]/e2-product-outlets[1]/cx-page-layout[2]/cx-page-slot[1]/e2-breadcrumb[1]/div[1]/span[1]/a[1]",
+          "learned_at": "2025-08-25T21:14:09.863Z",
+          "success_count": 8,
+          "last_success": "2025-08-25T21:41:19.123Z"
+        },
+        {
+          "selector": "xpath=/html[1]/body[1]/app-root[1]/cx-storefront[1]/main[1]/cx-page-layout[1]",
+          "learned_at": "2025-08-25T21:26:45.909Z",
+          "success_count": 10,
+          "last_success": "2025-08-25T21:40:42.166Z"
+        },
+        {
+          "selector": "xpath=/html[1]/body[1]/app-root[1]/cx-storefront[1]/main[1]/cx-page-layout[1]/e2-product-outlets[1]/cx-page-layout[2]/cx-page-slot[1]/e2-breadcrumb[1]/div[1]/span[2]/a[1]",
+          "learned_at": "2025-08-25T21:37:11.596Z",
+          "success_count": 9,
+          "last_success": "2025-08-25T21:40:38.138Z"
+        },
+        {
+          "selector": "xpath=/html[1]/body[1]/app-root[1]/cx-storefront[1]/main[1]/cx-page-layout[1]/e2-product-outlets[1]/cx-page-layout[2]/cx-page-slot[1]/e2-breadcrumb[1]/div[1]",
+          "learned_at": "2025-08-25T21:12:22.679Z",
+          "success_count": 10,
+          "last_success": "2025-08-25T21:36:56.196Z"
         }
       ]
     }

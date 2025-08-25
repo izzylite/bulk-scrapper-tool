@@ -17,17 +17,21 @@ const SUPERDRUG_CUSTOM_FIELDS = {
 
  
 
-async function extractSuperdrugProduct(page, urlObj, productName = null) {
+async function extractSuperdrugProduct(page, urlObj, productName = null, options = {}) {
     try {
-        // Wait for image elements to load
-        await page.waitForSelector('e2core-media[format="zoom"] img', { 
-            timeout: 15000,
-            state: 'attached' // Don't wait for visibility, just for element to exist
-        });
+        const allowedFields = Array.isArray(options?.allowedFields) ? new Set(options.allowedFields) : null;
+        // Only wait for images if they are requested
+        if (!allowedFields || allowedFields.has('images') || allowedFields.has('main_image')) {
+            await page.waitForSelector('e2core-media[format="zoom"] img', { 
+                timeout: 15000,
+                state: 'attached' // Don't wait for visibility, just for element to exist
+            });
+        }
         
         // Extract image information and custom Superdrug fields using direct selectors
         const extractedData = await page.evaluate((payload) => {
-            const {urlObj, productName} = payload;
+            const {urlObj, productName, allowedFieldsArray} = payload;
+            const allowedFields = Array.isArray(allowedFieldsArray) ? new Set(allowedFieldsArray) : null;
             // Define extraction functions inside the browser context
             // Note: productName is passed from generic.js
             
@@ -261,23 +265,54 @@ async function extractSuperdrugProduct(page, urlObj, productName = null) {
                 return extractSectionTextByHeading('Product Specification');
             }
 
-            function extractCustomFields(urlObj) {
-                return {
-                    marketplace: extractMarketplaceInfo(urlObj),
-                    features: extractFeatures(),
-                    product_specification: extractProductSpecification()
-                };
+            function extractCustomFields(urlObj, allowedFields) {
+                const out = {};
+                if (!allowedFields || allowedFields.has('marketplace')) {
+                    out.marketplace = extractMarketplaceInfo(urlObj);
+                }
+                if (!allowedFields || allowedFields.has('features')) {
+                    out.features = extractFeatures();
+                }
+                if (!allowedFields || allowedFields.has('product_specification')) {
+                    out.product_specification = extractProductSpecification();
+                }
+                return out;
+            }
+
+            function extractBreadcrumbs() {
+                try {
+                    const container = document.querySelector('.breadcrumb-container');
+                    if (!container) return [];
+
+                    // Collect visible breadcrumb label texts in order
+                    const nodes = container.querySelectorAll('.breadcrumb-item .breadcrumb-item__text');
+                    const labels = Array.from(nodes)
+                        .map(el => (el.textContent || '').replace(/\s+/g, ' ').trim())
+                        .filter(Boolean)
+                        // Exclude generic "Home" entry
+                        .filter(text => text.toLowerCase() !== 'home');
+
+                    // Deduplicate while preserving order
+                    const seen = new Set();
+                    const out = [];
+                    for (const label of labels) {
+                        if (!seen.has(label)) { seen.add(label); out.push(label); }
+                    }
+                    return out;
+                } catch {
+                    return [];
+                }
             }
             
             // Execute extraction
-            const mainImage = extractMainImage();
-            const uniqueImages = extractComprehensiveImageGallery(mainImage, productName);
-            const customFields = extractCustomFields(urlObj);
-            
+            const mainImage = (allowedFields && !allowedFields.has('main_image')) ? null : extractMainImage();
+            const uniqueImages = (allowedFields && !allowedFields.has('images')) ? [] : extractComprehensiveImageGallery(mainImage, productName);
+            const breadcrumbs = (!allowedFields || allowedFields.has('breadcrumbs')) ? extractBreadcrumbs() : [];
+            const customFields = extractCustomFields(urlObj, allowedFields);
             const result = {
-                main_image: mainImage,
-                images: uniqueImages,
+                ...((allowedFields && !allowedFields.has('main_image') && !allowedFields.has('images')) ? {} : { main_image: mainImage, images: uniqueImages }),
                 ...customFields,
+                ...(breadcrumbs && breadcrumbs.length > 0 ? { breadcrumbs } : {}),
                 metadata: {
                     extraction_method: 'direct_selectors_with_custom_fields_and_alt_matching',
                     selectors_used: {
@@ -299,7 +334,7 @@ async function extractSuperdrugProduct(page, urlObj, productName = null) {
             }
             
             return result;
-        }, {urlObj, productName});
+        }, {urlObj, productName, allowedFieldsArray: allowedFields ? Array.from(allowedFields) : null});
         
         return extractedData;
         

@@ -91,8 +91,8 @@ async function testExtractionWithUrl(testUrl) {
 		// Breadcrumbs
 		console.log('\n🧭 Breadcrumbs:');
 		if (Array.isArray(extracted.breadcrumbs) && extracted.breadcrumbs.length > 0) {
-			extracted.breadcrumbs.forEach((b, i) => {
-				console.log(`  ${i + 1}. ${b.name} -> ${b.url}`);
+			extracted.breadcrumbs.forEach((label, i) => {
+				console.log(`  ${i + 1}. ${label}`);
 			});
 		} else {
 			console.log('  (none)');

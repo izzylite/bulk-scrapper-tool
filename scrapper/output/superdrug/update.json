@@ -3,7 +3,9 @@
   "update_fields": [
     "breadcrumbs",
     "features",
-    "product_specification"
+    "product_specification",
+    "length",
+    "height"
   ]
 }
 

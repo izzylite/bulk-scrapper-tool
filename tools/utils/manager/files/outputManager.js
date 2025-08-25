@@ -347,8 +347,7 @@ async function appendItemsToOutputFile(outputFilePath, successfulItems, metadata
     let validProducts = successfulItems.filter(isValidProduct).map(applyVendorOutputTransform);
     const filteredCount = originalCount - validProducts.length;
     
-    // Convert price fields to numbers for valid products
-    validProducts = convertPricesToNumbers(validProducts);
+    // Prices are emitted as numbers by upstream extractors
     
     if (filteredCount > 0) {
         console.log(`[OUTPUT-MANAGER] Filtered out ${filteredCount} items without valid prices (${validProducts.length}/${originalCount} items remain)`);
@@ -450,9 +449,9 @@ async function appendItemsToUpdateFile(updateFilePath, snapshots, metadata = {})
  
     // Filter and normalize prices
     const originalCount = snapshots.length;
-    let validProducts = snapshots.filter(isValidProduct).map(applyVendorOutputTransform);;
+    let validProducts = snapshots.filter(isValidProduct).map(applyVendorOutputTransform);
     const filteredCount = originalCount - validProducts.length;
-    validProducts = convertPricesToNumbers(validProducts);
+    // Prices are emitted as numbers by upstream extractors
 
     if (filteredCount > 0) {
         console.log(`[OUTPUT-MANAGER] Filtered out ${filteredCount} update items without valid prices (${validProducts.length}/${originalCount} remain)`);

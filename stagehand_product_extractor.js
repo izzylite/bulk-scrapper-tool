@@ -196,7 +196,7 @@ async function appendBatchToOutput(outputPath, meta, batchItems, processingFileP
 
     let result;
     if (mode === 'update') {
-        const mergedSnapshots = updateManager.mergeSnapshots(successfulItems, updateKey, updateFields, updateManager.getContext().baseline);
+        const mergedSnapshots = updateManager.mergeSnapshots(successfulItems, updateKey, updateFields);
         result = outputManager.appendItemsToUpdateFile(outputPath, mergedSnapshots, { vendor, sourceFile: meta.source_file, inputFileName });
     } else {
         result = outputManager.appendItemsToOutputFile(outputPath, successfulItems, { vendor, sourceFile: meta.source_file, inputFileName });

@@ -15,6 +15,7 @@
   "description": "",
   "dependencies": {
     "@browserbasehq/stagehand": "^2.4.2",
+    "better-sqlite3": "^9.6.0",
     "dotenv": "^16.4.5",
     "fast-xml-parser": "^5.2.5",
     "zod": "^3.25.76"

@@ -31,25 +31,25 @@ function processProductData(productData) {
 	const processed = { ...productData };
 	
 	// Apply cleanText to string fields
-	const textFields = ['name', 'description', 'category', 'weight', 'stock_status'];
+	const textFields = ['name', 'description', 'category', 'weight', 'height', 'length', 'stock_status'];
 	for (const field of textFields) {
 		if (processed[field] && typeof processed[field] === 'string') {
 			processed[field] = cleanText(processed[field]);
 		}
 	}
 	
-	// Apply dynamic markup to price
-	if (processed.price && typeof processed.price === 'string') {
-		const numericPrice = parsePrice(processed.price);
+	// Ensure numeric price output with dynamic markup applied
+	if (processed.price !== undefined && processed.price !== null) {
+		let numericPrice = null;
+		if (typeof processed.price === 'number' && Number.isFinite(processed.price)) {
+			numericPrice = processed.price;
+		} else if (typeof processed.price === 'string') {
+			numericPrice = parsePrice(processed.price);
+		}
 		if (numericPrice && numericPrice > 0) {
 			const markedUpPrice = applyDynamicMarkup(numericPrice);
-			// Keep the original currency format but update the price
-			const currencyMatch = processed.price.match(/[£$€¥₹]/);
-			const currency = currencyMatch ? currencyMatch[0] : '';
-			processed.price = `${currency}${markedUpPrice.toFixed(2)}`;
-			
-			// Store original price for reference
-			processed.original_price = numericPrice.toFixed(2);
+			processed.price = Math.round(markedUpPrice * 100) / 100;
+			processed.original_price = Math.round(numericPrice * 100) / 100;
 		}
 	}
 	
@@ -234,12 +234,25 @@ async function trySelectorsForField(page, field, selectors, vendor, timeout = 15
 				let value = null;
 				
 				if (field === 'main_image') {
-					const src = await page.locator(selectorOption).first().getAttribute('src', { timeout: Math.min(timeout, 5000) });
+					let src = null;
+					try {
+						src = await page.locator(selectorOption).first().getAttribute('src', { timeout: Math.min(timeout, 5000) });
+					} catch {
+						// Shadow DOM fallback
+						try { src = await page.locator(`pierce=${selectorOption}`).first().getAttribute('src', { timeout: Math.min(timeout, 5000) }); } catch {}
+					}
 					value = src ? cleanAndValidateUrl(src.trim()) : null;
 				} else if (field === 'stock_status') {
-					const isVisible = await page.locator(selectorOption).first().isVisible({ timeout: Math.min(timeout, 5000) });
+					let isVisible = false;
+					try {
+						isVisible = await page.locator(selectorOption).first().isVisible({ timeout: Math.min(timeout, 5000) });
+					} catch {
+						try { isVisible = await page.locator(`pierce=${selectorOption}`).first().isVisible({ timeout: Math.min(timeout, 5000) }); } catch {}
+					}
 					if (isVisible) {
-						const text = await page.locator(selectorOption).first().innerText({ timeout: 3000 });
+						let text = '';
+						try { text = await page.locator(selectorOption).first().innerText({ timeout: 3000 }); }
+						catch { try { text = await page.locator(`pierce=${selectorOption}`).first().innerText({ timeout: 3000 }); } catch {} }
 						const isOutOfStock = /out of stock|sold out|unavailable|not available/i.test(text);
 						value = isOutOfStock ? 'Out of stock' : 'In stock';
 					} else {
@@ -254,16 +267,22 @@ async function trySelectorsForField(page, field, selectors, vendor, timeout = 15
 						const element = await page.locator(selectorOption).first();
 						if (selectorOption.includes('input') && selectorOption.includes('hidden')) {
 							// For hidden input fields, get the value attribute
-							const inputValue = await element.getAttribute('value', { timeout: Math.min(timeout, 5000) });
+							let inputValue = null;
+							try { inputValue = await element.getAttribute('value', { timeout: Math.min(timeout, 5000) }); }
+							catch { try { inputValue = await page.locator(`pierce=${selectorOption}`).first().getAttribute('value', { timeout: Math.min(timeout, 5000) }); } catch {} }
 							value = inputValue === 'true' || inputValue === true;
 						} else {
 							// For other elements, check visibility/existence
-							const isVisible = await element.isVisible({ timeout: Math.min(timeout, 5000) });
+							let isVisible = false;
+							try { isVisible = await element.isVisible({ timeout: Math.min(timeout, 5000) }); }
+							catch { try { isVisible = await page.locator(`pierce=${selectorOption}`).first().isVisible({ timeout: Math.min(timeout, 5000) }); } catch {} }
 							value = isVisible;
 						}
 					} else {
 						// For text fields (name, price, weight, description, category, custom string fields)
-						const text = await page.locator(selectorOption).first().innerText({ timeout: Math.min(timeout, 5000) });
+						let text = null;
+						try { text = await page.locator(selectorOption).first().innerText({ timeout: Math.min(timeout, 5000) }); }
+						catch { try { text = await page.locator(`pierce=${selectorOption}`).first().innerText({ timeout: Math.min(timeout, 5000) }); } catch {} }
 						value = text ? text.trim() : null;
 					}
 				}
@@ -307,7 +326,7 @@ async function tryExtractWithVendorSelectors(page, vendor, urlObj, allowedFields
 		if (selectors && Object.keys(selectors).length > 0) {
 			console.log(`[VENDOR_STRATEGY] Found ${Object.keys(selectors).length} learned selectors`);
 
-			let baseFieldsToExtract = ['name', 'price', 'weight', 'description', 'category', 'main_image', 'stock_status'];
+			let baseFieldsToExtract = ['name', 'price', 'weight', 'height', 'length', 'description', 'category', 'main_image', 'stock_status'];
 			if (allowedFields) {
 				baseFieldsToExtract = baseFieldsToExtract.filter(f => allowedFields.has(f));
 			}
@@ -345,9 +364,21 @@ async function tryExtractWithVendorSelectors(page, vendor, urlObj, allowedFields
 			if (vendor === 'superdrug' && strategy.extractSuperdrugProduct) {
 				extractFunction = strategy.extractSuperdrugProduct;
 			}
+
+			const shouldSkipVendorStrategy = (fieldName) => 
+				allowedFields && !allowedFields.has(fieldName);
+
+			// Decide if vendor strategy is necessary for the requested fields
+			const customFieldNames = Object.keys(getVendorCustomFields(vendor));
+			const needsCustom = allowedFields ? customFieldNames.some(f => allowedFields.has(f)) : customFieldNames.length > 0;
+			const needsImages = !allowedFields || allowedFields.has('images') || allowedFields.has('main_image');
+
 			// Add more vendor-specific extraction functions here as needed
 
 			if (extractFunction) {
+				if (!needsImages && !needsCustom) {
+					console.log(`[VENDOR_STRATEGY] Skipping vendor strategy for ${vendor} (no requested fields)`);
+				} else {
 				// First try to get product name from learned selectors or extract it directly
 				const getProductNameForVendor = async () => {
 					// Try to get name from learned selectors first
@@ -363,7 +394,7 @@ async function tryExtractWithVendorSelectors(page, vendor, urlObj, allowedFields
 				// Extract all vendor-specific data in one call
 				extractionPromises.push(
 					getProductNameForVendor().then(productName =>
-						extractFunction(page, urlObj, productName)
+						extractFunction(page, urlObj, productName, { allowedFields: allowedFields ? Array.from(allowedFields) : null })
 							.then(vendorResult => {
 								// console.log(`[VENDOR_STRATEGY] Vendor result:`, vendorResult);
 								const results = [];
@@ -388,6 +419,11 @@ async function tryExtractWithVendorSelectors(page, vendor, urlObj, allowedFields
 										results.push({ field: 'main_image', value: vendorResult.main_image, successfulSelector: null });
 									}
 
+									// Handle breadcrumbs provided by vendor strategy
+									if (Array.isArray(vendorResult.breadcrumbs) && (!allowedFields || allowedFields.has('breadcrumbs'))) {
+										results.push({ field: 'breadcrumbs', value: vendorResult.breadcrumbs, successfulSelector: null });
+									}
+
 									// Handle custom vendor fields
 									const customFieldNames = Object.keys(getVendorCustomFields(vendor));
 									const filteredCustomFieldNames = allowedFields ? customFieldNames.filter(n => allowedFields.has(n)) : customFieldNames;
@@ -408,6 +444,7 @@ async function tryExtractWithVendorSelectors(page, vendor, urlObj, allowedFields
 							})
 					)
 				);
+				}
 			} else {
 				console.log(`[VENDOR_STRATEGY] No extraction function found for ${vendor}`);
 			}
@@ -518,12 +555,11 @@ async function extractGeneric(page, urlObj, updateCtx = null) {
 		price: z.string().describe('Displayed price text, including currency symbol if shown'),
 		stock_status: z.string().describe('Stock availability status: "In stock" or "Out of stock"'),
 		weight: z.string().describe('Pack size/weight/volume text if available, e.g., 500g or 2x100ml'),
+		height: z.string().describe('Product height dimension text if available (e.g., 10 cm). Return empty string if not present.'),
+		length: z.string().describe('Product length dimension text if available (e.g., 15 cm). Return empty string if not present.'),
 		description: z.string().describe('Primary product description or details shown on the page'),
 		category: z.string().describe('Primary product category or breadcrumb category text shown on the page'),
-		breadcrumbs: z.array(z.object({
-			name: z.string().describe('Breadcrumb label text'),
-			url: z.string().describe('Breadcrumb URL for this level (http/https)')
-		})).describe('Breadcrumb trail as an array of {name, url} objects in order from root to current page'),
+		breadcrumbs: z.array(z.string()).describe('Breadcrumb trail as an ordered array of breadcrumb label strings from root to current page'),
 	
 	};
 
@@ -603,7 +639,7 @@ async function extractGeneric(page, urlObj, updateCtx = null) {
 	if (allowedFields) fieldsForLLM = fieldsForLLM.filter(f => allowedFields.has(f));
 
 	// Build dynamic instruction including custom vendor fields
-	const baseInstruction = "Extract the product's name, primary image URL, displayed price, all product image URLs, stock status, pack size/weight, category, and a concise description";
+	const baseInstruction = "Extract the product's name, primary image URL, displayed price, all product image URLs, stock status, pack size/weight, height, length, category, and a concise description";
 	const vendorCustomFieldNames = Object.keys(getVendorCustomFields(vendor));
 	let instruction = baseInstruction;
 	
@@ -632,9 +668,11 @@ async function extractGeneric(page, urlObj, updateCtx = null) {
 				case 'images': return 'all product image URLs or empty array if no images found';
 				case 'stock_status': return 'stock status';
 				case 'weight': return 'pack size/weight';
+				case 'height': return 'product height (dimension text)';
+				case 'length': return 'product length (dimension text)';
 				case 'description': return 'description';
 				case 'category': return 'category';
-				case 'breadcrumbs': return 'breadcrumbs (array of objects with name and url)';
+				case 'breadcrumbs': return 'breadcrumbs (array of breadcrumb labels as strings, in order)';
 				default:
 					// For custom vendor fields, try to extract description from Zod schema
 					const fieldDef = fieldDefinitions[field];
@@ -651,7 +689,7 @@ async function extractGeneric(page, urlObj, updateCtx = null) {
 
 	// Strengthen breadcrumbs guidance when requested
 	if (fieldsForLLM.includes('breadcrumbs')) {
-		instruction += ' Return breadcrumbs as an ordered array of objects with fields name and url. Prefer the page breadcrumb nav or JSON-LD of type BreadcrumbList. Ensure url is absolute (http/https) and exclude duplicates like Home.';
+		instruction += ' Return breadcrumbs as an ordered array of strings (labels only). Prefer the page breadcrumb nav or JSON-LD BreadcrumbList. Exclude duplicates or generic entries like Home.';
 	}
  
 	// Build dynamic schema with only needed fields
@@ -687,7 +725,7 @@ async function extractGeneric(page, urlObj, updateCtx = null) {
 	const normalizedData = { ...extractedDefaults, ...extractedData };
 
 	// Extract base fields (respect allowedFields subset)
-	const { name, main_image, images, price, stock_status, weight, description, category, breadcrumbs } = normalizedData;
+	const { name, main_image, images, price, stock_status, weight, height, length, description, category, breadcrumbs } = normalizedData;
 
 	// Extract all custom fields dynamically
 	const customFieldData = {};
@@ -721,19 +759,18 @@ async function extractGeneric(page, urlObj, updateCtx = null) {
 	if (mainImage && (!allowedFields || allowedFields.has('images'))) imagesList.unshift(mainImage);
 	imagesList = Array.from(new Set(imagesList.filter(Boolean)));
 
-	// Normalize breadcrumbs: ensure array of { name, url } with valid URLs
+	// Normalize breadcrumbs: ensure array of cleaned label strings
 	let breadcrumbsList = [];
 	if (!allowedFields || allowedFields.has('breadcrumbs')) {
 		if (Array.isArray(breadcrumbs)) {
-			breadcrumbsList = breadcrumbs
-				.map(b => {
-					if (!b || typeof b !== 'object') return null;
-					const nameVal = typeof b.name === 'string' ? cleanText(b.name) : '';
-					const urlVal = typeof b.url === 'string' ? cleanAndValidateUrl(b.url) : null;
-					if (!nameVal || !urlVal) return null;
-					return { name: nameVal, url: urlVal };
-				})
-				.filter(Boolean);
+			const labels = breadcrumbs.map(b => {
+				if (typeof b === 'string') return cleanText(b);
+				if (b && typeof b === 'object' && typeof b.name === 'string') return cleanText(b.name);
+				return '';
+			}).filter(s => s && s !== 'home');
+			// Deduplicate while preserving order
+			const seen = new Set();
+			for (const label of labels) { if (!seen.has(label)) { seen.add(label); breadcrumbsList.push(label); } }
 		}
 	}
 
@@ -745,6 +782,8 @@ async function extractGeneric(page, urlObj, updateCtx = null) {
 		...(allowedFields && !allowedFields.has('price') ? {} : { price }),
 		...(allowedFields && !allowedFields.has('stock_status') ? {} : { stock_status }),
 		...(allowedFields && !allowedFields.has('weight') ? {} : { weight }),
+		...(allowedFields && !allowedFields.has('height') ? {} : { height }),
+		...(allowedFields && !allowedFields.has('length') ? {} : { length }),
 		...(allowedFields && !allowedFields.has('description') ? {} : { description }),
 		...(allowedFields && !allowedFields.has('category') ? {} : { category }),
 		...(allowedFields && !allowedFields.has('breadcrumbs') ? {} : { breadcrumbs: breadcrumbsList }),

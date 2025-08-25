@@ -5,6 +5,8 @@ const path = require('path');
 const { findActiveProcessingFile, deactivateProcessingFile, getProcessingFiles } = require('./files/pendingManager');
 const inputManager = require('./files/inputManager');
 const outputManager = require('./files/outputManager');
+const { buildBaselineForVendorSqlite } = require('./baselineStore');
+const { toNumber } = require('../mark_up_price');
 
 // Module-scoped update context
 let __ctx = {
@@ -12,7 +14,7 @@ let __ctx = {
     vendor: null,
     updateKey: null,
     updateFields: null,
-    baseline: null // Map<key, snapshot>
+    baseline: null // BaselineIndexSqlite
 };
 
 function getContext() { return __ctx; }
@@ -37,28 +39,8 @@ function loadVendorUpdateConfig(vendor) {
 }
 
 function buildBaselineForVendor(vendor, updateKey) {
-    const vendorDir = outputManager.ensureVendorDirectoryExists(vendor);
-    const files = fs.readdirSync(vendorDir)
-        .filter(f => f.endsWith('.json') && f !== 'update.json' && !/\.update(_\d+)?\.json$/.test(f));
-    const map = new Map();
-    for (const file of files) {
-        try {
-            const filePath = path.join(vendorDir, file);
-            const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
-            if (!data || !Array.isArray(data.items)) continue;
-            for (const item of data.items) {
-                const key = getIdentityKey(item, updateKey);
-                if (!key) continue;
-                const prev = map.get(key);
-                const prevTs = prev ? (prev.updated_at || prev.last_checked_at || prev.created_at) : null;
-                const curTs = item.updated_at || item.last_checked_at || data.updated_at || data.created_at;
-                if (!prev || isNewerByTimestamp(curTs, prevTs)) {
-                    map.set(key, { ...item });
-                }
-            }
-        } catch { }
-    }
-    return map;
+	// Enforce SQLite baseline; fail fast if it cannot be created/loaded
+	return buildBaselineForVendorSqlite(vendor, updateKey);
 }
 
 function toProcessingItemFromBaseline(vendor, snapshot) {
@@ -84,11 +66,27 @@ function applyFieldUpdates(original, fresh, updateFields) {
     const nowIso = new Date().toISOString();
     const beforePrice = original ? original.price : undefined;
     const beforeStock = original ? original.stock_status : undefined;
-    if (beforePrice !== updated.price) {
+    // Add price_history only when the price value is actually updated and changed
+    const updatedPriceProvided = Array.isArray(updateFields) ? updateFields.includes('price') && fresh && fresh.price !== undefined : (fresh && fresh.price !== undefined);
+    let priceChanged = false;
+    if (updatedPriceProvided) {
+        const beforePriceNum = toNumber(beforePrice);
+        const freshPriceNum = toNumber(fresh.price);
+        if (beforePriceNum !== null && freshPriceNum !== null) {
+            priceChanged = Number(beforePriceNum.toFixed ? beforePriceNum.toFixed(2) : beforePriceNum) !== Number(freshPriceNum.toFixed ? freshPriceNum.toFixed(2) : freshPriceNum);
+        } else {
+            const beforeStr = (beforePrice === undefined || beforePrice === null) ? '' : String(beforePrice).trim();
+            const freshStr = (fresh.price === undefined || fresh.price === null) ? '' : String(fresh.price).trim();
+            priceChanged = beforeStr !== freshStr;
+        }
+    }
+
+    if (priceChanged) {
         updated.price_history = Array.isArray(original?.price_history) ? [...original.price_history] : [];
-        updated.price_history.push({ old: beforePrice, new: updated.price, changed_at: nowIso });
-    } else if (Array.isArray(original?.price_history)) {
-        updated.price_history = [...original.price_history];
+        updated.price_history.push({ old: beforePrice, new: fresh.price, changed_at: nowIso });
+    } else {
+        // Do not include price_history unless there is a change in update mode
+        if (updated.price_history !== undefined) delete updated.price_history;
     }
     if (beforeStock !== updated.stock_status) {
         updated.stock_history = Array.isArray(original?.stock_history) ? [...original.stock_history] : [];
@@ -100,9 +98,9 @@ function applyFieldUpdates(original, fresh, updateFields) {
     return updated;
 }
 
-function mergeSnapshots(freshItems, updateKey, updateFields, baseline) {
+function mergeSnapshots(freshItems, updateKey, updateFields) {
     const merged = [];
-    const base = baseline || (__ctx && __ctx.baseline);
+    const base = (__ctx && __ctx.baseline) || null;
     for (const fresh of freshItems || []) {
         const key = getIdentityKey(fresh, updateKey || (__ctx && __ctx.updateKey));
         const original = base ? base.get(key) : null;
@@ -172,12 +170,26 @@ async function prepareUpdateModeIfNeeded(cli) {
     const sourceFiles = fs.readdirSync(outputManager.ensureVendorDirectoryExists(vendor))
         .filter(f => f.endsWith('.json') && f !== 'update.json' && !/\.update(_\d+)?\.json$/.test(f));
 
+    const totalInBaseline = typeof baseline.size === 'number' ? baseline.size : undefined;
+    let scanned = 0;
+    let lastLogTs = Date.now();
     for (const [, snapshot] of baseline) {
+        scanned++;
         const ts = snapshot.last_checked_at || snapshot.updated_at || snapshot.created_at;
         if (staleBefore && ts && new Date(ts).getTime() >= new Date(staleBefore).getTime()) {
             continue; // not stale
         }
         items.push(toProcessingItemFromBaseline(vendor, snapshot));
+
+        // Periodic progress log so user sees advancement even with large baselines
+        if (scanned % 2000 === 0 || (Date.now() - lastLogTs) > 2000) {
+            if (typeof totalInBaseline === 'number') {
+                console.log(`[UPDATE] Scanned ${scanned}/${totalInBaseline} baseline snapshots...`);
+            } else {
+                console.log(`[UPDATE] Scanned ${scanned} baseline snapshots...`);
+            }
+            lastLogTs = Date.now();
+        }
     }
 
     const extraMeta = { mode: 'update', update_key: updateKey || 'sku', update_fields: updateFields || [], ...(staleBefore ? { stale_before: staleBefore } : {}) };

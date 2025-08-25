@@ -114,28 +114,12 @@ async function saveVendorSelectors(vendor, partial) {
                 }
                 
                 // If we have enough selectors, remove one to make room for the new one
-                if (current.selectors[field].length >= 5) {
+                const maxSelectors = Number(process.env.MAX_SELECTORS_PER_FIELD) || 10;
+                if (current.selectors[field].length >= maxSelectors) {
                     // Remove the oldest selector (last in array) to make room
                     const removed = current.selectors[field].pop();
                     console.log(`[SELECTOR_LEARNING] Removed oldest selector for ${field} to make room for new one: ${removed.selector.substring(0, 50)}...`);
-                } 
-                // else if (current.selectors[field].length > 0) {
-                //     // If we have selectors with high success count (8+), remove the one with lowest success count
-                //     const hasHighSuccessSelector = current.selectors[field].some(s => s.success_count >= 8);
-                //     if (hasHighSuccessSelector) {
-                //         // Find selector with lowest success count
-                //         let lowestIndex = 0;
-                //         let lowestCount = current.selectors[field][0].success_count;
-                //         for (let i = 1; i < current.selectors[field].length; i++) {
-                //             if (current.selectors[field][i].success_count < lowestCount) {
-                //                 lowestCount = current.selectors[field][i].success_count;
-                //                 lowestIndex = i;
-                //             }
-                //         }
-                //         const removed = current.selectors[field].splice(lowestIndex, 1)[0];
-                //         console.log(`[SELECTOR_LEARNING] Removed low-success selector for ${field} (count: ${removed.success_count}) to make room for new one`);
-                //     }
-                // }
+                }  
                 
                 // Check if this selector already exists in the history
                 const existingIndex = current.selectors[field].findIndex(s => s.selector === selector);
@@ -199,7 +183,7 @@ async function learnAndCacheSelectors(page, vendor, item) {
     const learned = {};
     // Learn selectors for static fields, main_image, stock_status, and breadcrumbs container
     // Truly dynamic fields (like full images array) will always use LLM
-    const baseFieldsToLearn = ['name', 'price', 'main_image', 'weight', 'description', 'category', 'stock_status', 'breadcrumbs'];
+    const baseFieldsToLearn = ['name', 'price', 'main_image', 'weight', 'height', 'length', 'description', 'category', 'stock_status', 'breadcrumbs'];
     
     // Add custom vendor fields that are suitable for selector learning (non-dynamic fields)
     const customFieldNames = Object.keys(getVendorCustomFields(vendor));
@@ -274,7 +258,13 @@ async function learnAndCacheSelectors(page, vendor, item) {
                 }
             }
              
-            const observation = await page.observe(observePrompt, { timeout: 10000 }); // Increased timeout
+            let observation = null;
+            try {
+                observation = await page.observe(observePrompt, { timeout: 10000 }); // Increased timeout
+            } catch (observeErr) {
+                // Shadow DOM often breaks naive observation follow-ups; keep going, validation will try pierce selectors
+                observation = null;
+            }
              
             
             if (observation && Array.isArray(observation) && observation.length > 0) {
@@ -311,10 +301,14 @@ async function learnAndCacheSelectors(page, vendor, item) {
                         
                         if (field === 'breadcrumbs') {
                             // Validate breadcrumb container: must be visible and contain links
-                            const isVisible = await page.locator(selector).first().isVisible({ timeout: 5000 });
+                            let isVisible = false;
+                            try { isVisible = await page.locator(selector).first().isVisible({ timeout: 5000 }); }
+                            catch { try { isVisible = await page.locator(`pierce=${selector}`).first().isVisible({ timeout: 5000 }); } catch {} }
                             if (isVisible) {
                                 try {
-                                    const linkCount = await page.locator(selector).first().locator('a').count({ timeout: 2000 });
+                                    let linkCount = 0;
+                                    try { linkCount = await page.locator(selector).first().locator('a').count({ timeout: 2000 }); }
+                                    catch { linkCount = await page.locator(`pierce=${selector}`).first().locator('a').count({ timeout: 2000 }); }
                                     if (linkCount > 0) {
                                         observeResults.push({ field, selector, method: 'observe' });
                                         continue;
@@ -326,7 +320,9 @@ async function learnAndCacheSelectors(page, vendor, item) {
                             }
                         } else if (field === 'main_image') {
                             // For main_image, validate by checking src attribute
-                            const testSrc = await page.locator(selector).first().getAttribute('src', { timeout: 5000 }); 
+                            let testSrc = null;
+                            try { testSrc = await page.locator(selector).first().getAttribute('src', { timeout: 5000 }); }
+                            catch { try { testSrc = await page.locator(`pierce=${selector}`).first().getAttribute('src', { timeout: 5000 }); } catch {} }
                             if (testSrc) {
                                 // Be more lenient with image URL matching - extract filename/path components
                                 const valueFileName = value.split('/').pop()?.split('?')[0] || '';
@@ -340,7 +336,9 @@ async function learnAndCacheSelectors(page, vendor, item) {
                             }
                         } else if (field === 'stock_status') {
                             // For stock_status, check if the element exists and contains out-of-stock indicators
-                            const testText = await page.locator(selector).first().innerText({ timeout: 5000 });
+                            let testText = '';
+                            try { testText = await page.locator(selector).first().innerText({ timeout: 5000 }); }
+                            catch { try { testText = await page.locator(`pierce=${selector}`).first().innerText({ timeout: 5000 }); } catch {} }
                             const isOutOfStock = /out of stock|sold out|unavailable|not available/i.test(testText);
                             if (isOutOfStock) { 
                                 observeResults.push({ field, selector, method: 'observe' });
@@ -353,13 +351,17 @@ async function learnAndCacheSelectors(page, vendor, item) {
                             if (fieldDef && fieldDef._def && fieldDef._def.typeName === 'ZodBoolean') {
                                 // For boolean custom fields, validate based on selector type
                                 if (selector.includes('input') && selector.includes('hidden')) {
-                                    const inputValue = await page.locator(selector).first().getAttribute('value', { timeout: 5000 }); 
+                                    let inputValue = null;
+                                    try { inputValue = await page.locator(selector).first().getAttribute('value', { timeout: 5000 }); }
+                                    catch { try { inputValue = await page.locator(`pierce=${selector}`).first().getAttribute('value', { timeout: 5000 }); } catch {} }
                                     if (inputValue === 'true' && (value === 'true' || value === true)) { 
                                         observeResults.push({ field, selector, method: 'observe' });
                                         continue;
                                     }
                                 } else {
-                                    const isVisible = await page.locator(selector).first().isVisible({ timeout: 5000 });
+                                    let isVisible = false;
+                                    try { isVisible = await page.locator(selector).first().isVisible({ timeout: 5000 }); }
+                                    catch { try { isVisible = await page.locator(`pierce=${selector}`).first().isVisible({ timeout: 5000 }); } catch {} }
                                     if (isVisible && (value === 'true' || value === true)) {
                                         observeResults.push({ field, selector, method: 'observe' });
                                         continue;
@@ -367,7 +369,9 @@ async function learnAndCacheSelectors(page, vendor, item) {
                                 }
                             } else {
                                 // For text fields, validate by checking inner text
-                                const testText = await page.locator(selector).first().innerText({ timeout: 5000 }); 
+                                let testText = '';
+                                try { testText = await page.locator(selector).first().innerText({ timeout: 5000 }); }
+                                catch { try { testText = await page.locator(`pierce=${selector}`).first().innerText({ timeout: 5000 }); } catch {} }
                                 if (testText && (testText.includes(value) || value.includes(testText))) { 
                                     observeResults.push({ field, selector, method: 'observe' });
                                     continue;

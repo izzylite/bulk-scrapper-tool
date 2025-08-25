@@ -42,9 +42,10 @@ Note: variant-specific keys like `variant_sku`, `variant_url`, `include_variants
 ### Processing file in update mode
 When `--update` is set, for each vendor:
 1) Deactivate any active processing job.
-2) Scan `scrapper/output/<vendor>/*.json` and build a baseline index of products.
-   - Stream files to avoid creating one giant merged JSON.
-   - Build `{ key → baselineSnapshot }` in memory, or a lightweight `{ key → {file, offset} }` index if memory-constrained.
+2) Scan `scrapper/output/<vendor>/*.json` and build a SQLite baseline index of products.
+   - Stream/scan files to avoid creating one giant merged JSON.
+   - Persist `{ key → { file, item_index, updated_at, created_at } }` into `scrapper/output/<vendor>/updates/baseline.index.sqlite`.
+   - Reuse existing index when `meta.last_scan_mtime` ≥ latest vendor outputs mtime; otherwise rebuild.
 3) Create a new processing file in `scrapper/processing/` with fields:
    - `active: true`
    - `vendor`
@@ -95,19 +96,14 @@ These additions are optional and ignored by normal mode.
 - Failed items are captured in the processing file with `error`, `retry_count`, and `error_timestamp` (existing logic).
 - Successful URLs are batch-removed; file deactivates and auto-archives when empty (existing logic).
 
-### Baseline and In‑Memory Items
-- **Baseline purpose**: provide a fast lookup of the current canonical products for a vendor, built from `scrapper/output/<vendor>/*.json` (excluding `updates/`). It powers: target selection (e.g., staleness) and full-snapshot merging during updates.
+### Baseline (SQLite Index)
+- **Purpose**: fast lookup of canonical products for a vendor, built from `scrapper/output/<vendor>/*.json` (excluding `updates/`). Powers target selection (e.g., staleness) and full-snapshot merging.
 - **Identity key**: derive per item using `update_key` (fallback order: `product_id` → `sku` → `product_url|source_url` → `url`).
-
-Two strategies:
-- **BaselineMap (simple, memory-heavy)**
-  - Build `Map<key, { snapshot, sourceFile, updated_at }>` by streaming vendor outputs.
-  - On duplicate keys, keep the newest by `updated_at` (fallback `created_at`).
-  - Pros: O(1) merge per item. Cons: high memory for very large catalogs.
-- **BaselineIndex (lean, on-demand fetch)**
-  - Build `Map<key, { filePath, itemIndex, updated_at }>` only; discard item payloads.
-  - When writing an updated snapshot, fetch the original on demand by `{filePath, itemIndex}`.
-  - Pros: low memory. Cons: extra I/O per merge.
+- **Storage**: `scrapper/output/<vendor>/updates/baseline.index.sqlite`
+  - `items(key TEXT PRIMARY KEY, file TEXT NOT NULL, item_index INTEGER, updated_at TEXT, created_at TEXT)`
+  - `meta(name TEXT PRIMARY KEY, value TEXT)`
+  - Index on `updated_at` for optional staleness filtering.
+  - Reuse policy: if `meta.last_scan_mtime` ≥ latest vendor output mtime, reuse; else rebuild.
 
 Creating processing items (used to build the update processing file):
 - For each baseline entry, create a minimal work item: `{ url, vendor, image_url?, sku? }` where
@@ -118,52 +114,45 @@ Creating processing items (used to build the update processing file):
 
 Merging to produce updated full snapshots:
 - On each successful extraction:
-  - Compute `key` from the fresh item; lookup original via BaselineMap/Index.
+  - Compute `key` from the fresh item; lookup original by querying SQLite for `(file, item_index)` and lazily loading that one item from disk.
   - Start from original snapshot; update only `update_fields` (or all fields if unspecified).
   - Set `last_checked_at` now; append `price_history`/`stock_history` entries on changes.
   - If no baseline match, treat as insert and write the fresh item as a full snapshot.
 - Write to `scrapper/output/<vendor>/updates/<base>.update[_N].json` with rotation.
 
 Concurrency and caching:
-- Keep the baseline map/index in a module-level singleton shared by workers to avoid repeated scans.
-- Optionally persist a sidecar index (e.g., `updates/baseline.index.json`) to skip rebuilds on restart.
+- Keep the SQLite baseline handle in a module-level singleton shared by workers to avoid repeated scans.
+- SQLite file is per vendor; supports concurrent reads safely. Rebuild only when source outputs change (mtime).
 
-Pseudocode (BaselineMap):
+Pseudocode (SQLite Baseline Index):
 ```js
-const baseline = new Map();
-for (const file of vendorOutputFiles) {
-  for (const item of streamItems(file)) {
-    const key = getKey(item);
-    if (!key) continue;
-    const prev = baseline.get(key);
-    if (!prev || isNewer(item, prev.updated_at)) {
-      baseline.set(key, { snapshot: item, sourceFile: file, updated_at: item.updated_at });
+// Build/refresh index once
+const latestMtime = getLatestVendorOutputsMtime();
+if (meta.last_scan_mtime >= latestMtime) reuse();
+else {
+  for (const file of vendorOutputFiles) {
+    const data = readJson(file);
+    const fileTs = data.updated_at || data.created_at;
+    for (let i = 0; i < data.items.length; i++) {
+      const item = data.items[i];
+      const key = getKey(item);
+      if (!key) continue;
+      const curTs = item.updated_at || item.last_checked_at || fileTs;
+      upsert(items, { key, file, item_index: i, updated_at: curTs, created_at: data.created_at });
+      // keep newest updated_at on conflicts
     }
   }
+  meta.last_scan_mtime = latestMtime;
 }
-```
 
-Pseudocode (BaselineIndex):
-```js
-const index = new Map();
-for (const file of vendorOutputFiles) {
-  let i = 0;
-  for (const item of streamItems(file)) {
-    const key = getKey(item);
-    if (!key) { i++; continue; }
-    const prev = index.get(key);
-    if (!prev || isNewer(item, prev.updated_at)) {
-      index.set(key, { filePath: file, itemIndex: i, updated_at: item.updated_at });
-    }
-    i++;
-  }
-}
-// Later, when merging: const original = readItemAt(index.get(key));
+// Merge lookup
+const row = select items where key = freshKey;
+const original = row ? readJson(row.file).items[row.item_index] : null;
 ```
 
 ### Performance considerations
-- Avoid physically merging all outputs. Stream-scan and index instead.
-- Cache baseline index in memory for the run; share across workers via a module-level singleton.
+- Avoid physically merging all outputs. Stream-scan and index into SQLite instead.
+- Share a single SQLite handle per vendor across workers during the run.
 - Keep 10k-per-file rotation for update files in `updates/` to manage file sizes.
 
 ### Backward compatibility

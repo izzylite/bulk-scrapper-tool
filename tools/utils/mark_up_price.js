@@ -34,7 +34,15 @@ function cleanText(text) {
      */
     return text.replace(/[^a-zA-Z0-9\s]/g, '').trim().toLowerCase();
 }
-
+const toNumber = (val) => {
+    if (val === null || val === undefined) return null;
+    if (typeof val === 'number' && Number.isFinite(val)) return val;
+    if (typeof val === 'string') {
+        const n = parsePrice(val);
+        return Number.isFinite(n) ? n : null;
+    }
+    return null;
+};
 // Helper function to extract numeric price from price text
 function parsePrice(priceText) {
 	if (!priceText || typeof priceText !== 'string') return null;
@@ -54,5 +62,6 @@ module.exports = {
     priceMarkupRules,
     applyDynamicMarkup,
     cleanText,
+    toNumber,
     parsePrice
 };
