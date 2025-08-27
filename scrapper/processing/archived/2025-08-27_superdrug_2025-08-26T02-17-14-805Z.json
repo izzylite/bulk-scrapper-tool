@@ -1,0 +1,26 @@
+{
+  "active": false,
+  "vendor": "superdrug",
+  "total_count": 33838,
+  "processed_count": 33838,
+  "exclude": [],
+  "source_files": [
+    "superdrug_batch_2.json"
+  ],
+  "items": [],
+  "mode": "update",
+  "update_key": "sku",
+  "update_fields": [
+    "breadcrumbs",
+    "description",
+    "price",
+    "features",
+    "stock_status",
+    "product_specification",
+    "warnings_or_restrictions",
+    "tips_and_advice",
+    "length",
+    "height",
+    "name"
+  ]
+}

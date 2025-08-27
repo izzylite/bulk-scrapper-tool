@@ -99,8 +99,8 @@ async function testExtractionWithUrl(testUrl) {
 		}
 
 		// Optional fields commonly used
-		const optionalFields = ['features', 'product_specification', 'category', 'description'];
-		console.log('\n🧩 Optional Fields:');
+		const optionalFields = ['features', 'product_specification', 'warnings_or_restrictions', 'tips_and_advice', 'category', 'description'];
+		console.log('\n🧩 Optional Fields__:');
 		optionalFields.forEach(f => {
 			if (extracted[f] !== undefined && extracted[f] !== null && extracted[f] !== '') {
 				console.log(`  ${f}:`, typeof extracted[f] === 'object' ? JSON.stringify(extracted[f]).slice(0, 600) : `${String(extracted[f]).slice(0, 200)}`);

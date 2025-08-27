@@ -81,20 +81,19 @@ function applyFieldUpdates(original, fresh, updateFields) {
         }
     }
 
-    if (priceChanged) {
-        updated.price_history = Array.isArray(original?.price_history) ? [...original.price_history] : [];
-        updated.price_history.push({ old: beforePrice, new: fresh.price, changed_at: nowIso });
-    } else {
-        // Do not include price_history unless there is a change in update mode
-        if (updated.price_history !== undefined) delete updated.price_history;
-    }
-    if (beforeStock !== updated.stock_status) {
-        updated.stock_history = Array.isArray(original?.stock_history) ? [...original.stock_history] : [];
-        updated.stock_history.push({ old: beforeStock, new: updated.stock_status, changed_at: nowIso });
-    } else if (Array.isArray(original?.stock_history)) {
-        updated.stock_history = [...original.stock_history];
-    }
-    updated.last_checked_at = nowIso;
+    // if (priceChanged) {
+    //     updated.price_history = Array.isArray(original?.price_history) ? [...original.price_history] : [];
+    //     updated.price_history.push({ old: beforePrice, new: fresh.price, changed_at: nowIso });
+    // } else {
+    //     // Do not include price_history unless there is a change in update mode
+    //     if (updated.price_history !== undefined) delete updated.price_history;
+    // }
+    // if (beforeStock.toLowerCase() !== updated.stock_status.toLowerCase()) {
+    //     updated.stock_history = Array.isArray(original?.stock_history) ? [...original.stock_history] : [];
+    //     updated.stock_history.push({ old: beforeStock, new: updated.stock_status, changed_at: nowIso });
+    // } else if (Array.isArray(original?.stock_history)) {
+    //     updated.stock_history = [...original.stock_history];
+    // }
     return updated;
 }
 

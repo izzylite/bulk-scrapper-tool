@@ -416,6 +416,8 @@ async function appendItemsToOutputFile(outputFilePath, successfulItems, metadata
         outputData.total_items = outputData.items.length;
         outputData.filtered_invalid_count += filteredCount;
         outputData.updated_at = new Date().toISOString();
+        // Track last checked timestamp at the root level for update.json files
+        outputData.last_checked_at = new Date().toISOString();
         
         // Write output file
         try {

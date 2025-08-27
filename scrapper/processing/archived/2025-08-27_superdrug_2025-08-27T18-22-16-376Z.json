@@ -1,0 +1,14 @@
+{
+  "active": false,
+  "vendor": "superdrug",
+  "total_count": 0,
+  "processed_count": 0,
+  "exclude": [],
+  "source_files": [],
+  "items": [],
+  "mode": "update",
+  "update_key": "sku",
+  "update_fields": [
+    "name"
+  ]
+}

@@ -48,7 +48,7 @@ function parsePrice(priceText) {
 	if (!priceText || typeof priceText !== 'string') return null;
 	
 	// Remove currency symbols and extra whitespace
-	const cleanedPrice = priceText.replace(/[£$€¥₹]/g, '').replace(/[^\d.,]/g, '').trim();
+	const cleanedPrice = priceText.replace(/[£$€¥₹₽¢₩₪₦₡₵₴₸₺₼₾﷼]]/g, '').replace(/[^\d.,]/g, '').trim();
 	
 	// Handle different decimal separators
 	let numericPrice = cleanedPrice.replace(/,/g, '.');

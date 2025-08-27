@@ -164,8 +164,8 @@ async function updateErrorsInProcessingFile(processingFilePath, errorItems) {
 	// Create a map of URL -> error info for quick lookup
 	const errorMap = new Map();
 	errorItems.forEach(item => {
-		if (item && item.source_url && item.error) {
-			errorMap.set(item.source_url, {
+		if (item && item.url && item.error) {
+			errorMap.set(item.url, {
 				error: item.error,
 				error_timestamp: new Date().toISOString(),
 				retry_count: (item.retry_count || 0) + 1

@@ -1,5 +1,0 @@
-https://www.superdrug.com/toiletries/travel/suitcases/metz-20l-underseat-cabin-bag-backpack-40x20x25cm/p/mp-00076316?varSel=mp-00076322
-https://www.superdrug.com/toiletries/travel/suitcases/metz-20l-underseat-cabin-bag-backpack-40x20x25cm/p/mp-00076311
-https://www.superdrug.com/accessories-and-lifestyle/socks/mens-long-length-ribbed-socks-pack-of-3-uk-6-11/p/mp-00058269
-https://shopify.dev/docs/api/admin-rest/latest/resources/product
-https://shopify.dev/docs/api/admin-rest/latest/resources/product-variant#resource-object

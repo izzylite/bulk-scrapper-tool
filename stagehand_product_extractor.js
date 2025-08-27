@@ -64,7 +64,16 @@ async function isBlocked(page, result) {
         if (blockedRx.test(text) || /captcha/i.test(urlNow)) return true;
 
         // Check for incomplete/suspicious extraction patterns
-        const allEmpty = !result?.name && !result?.main_image && !result?.price && !result?.product_url;
+        // Check all fields in the result object (not just a fixed set), treating empty arrays/strings as empty
+        const allEmpty = Object.keys(result || {}).every(key => {
+            const val = result[key];
+            if (Array.isArray(val)) return val.length === 0;
+            if (typeof val === 'string') return val.trim() === '';
+            if (typeof val === 'boolean') return val === false;
+            // For objects, treat empty object as empty
+            if (val && typeof val === 'object') return Object.keys(val).length === 0;
+            return !val;
+        });
         const incompleteExtraction = result?.metadata?.completed === false;
         const noImages = !result?.main_image && (!result?.images || result.images.length === 0);
 
@@ -205,7 +214,7 @@ async function appendBatchToOutput(outputPath, meta, batchItems, processingFileP
     const operations = [];
     if (processingFilePath && fs.existsSync(processingFilePath)) {
         if (successfulItems.length > 0) {
-            const successUrls = successfulItems.map(item => item.source_url);
+            const successUrls = successfulItems.map(item => item.url);
             operations.push(removeUrlsFromProcessingFile(processingFilePath, successUrls).then(() => console.log(`[APPENDED] (+${successUrls.length} items successfully processed and recorded)`)));
         }
         if (errorItems.length > 0) { operations.push(updateErrorsInProcessingFile(processingFilePath, errorItems).then(() => console.log(`[ERRORS] ${errorItems.length} URLs failed extraction (errors recorded in processing file)`))); }

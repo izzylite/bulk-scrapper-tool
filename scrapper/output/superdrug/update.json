@@ -1,11 +1,7 @@
 {
   "vendor": "superdrug",
-  "update_fields": [
-    "breadcrumbs",
-    "features",
-    "product_specification",
-    "length",
-    "height"
+  "update_fields": [ 
+    "name"
   ]
 }
 

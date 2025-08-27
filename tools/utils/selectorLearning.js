@@ -14,25 +14,28 @@ let pendingLearningFields = new Map(); // vendor -> Set of fields needing learni
  * @param {Array<string>} fields - Array of field names that need learning
  */
 function reportFieldsNeedingLearning(vendor, fields) {
-    if (!fields || fields.length === 0) return false;
+    if (!fields || fields.length === 0) return;
 
     // Get existing vendor fields or create new set
     if (!pendingLearningFields.has(vendor)) {
         pendingLearningFields.set(vendor, new Set());
     }
-    
+
     const vendorFields = pendingLearningFields.get(vendor);
-    let addedAny = false;
-    
+    let addedField = [];
+
     // Add new fields to vendor's set
     for (const field of fields) {
         if (!vendorFields.has(field)) {
             vendorFields.add(field);
-            addedAny = true;
+            addedField.push(field)
         }
     }
-    
-    return addedAny;
+    if (addedField.length > 0) {
+        console.log(`[LEARNING] Reporting new fields needing learning: ${addedField.join(', ')}`);
+        console.log(`[LEARNING] These fields were missing from direct extraction and found by LLM`);
+    }
+
 }
 
 /**

@@ -1,6 +1,7 @@
 'use strict';
 
 const { z } = require('zod');
+const { cleanText } = require('../utils/mark_up_price');
 
 /**
  * Superdrug-specific product extraction strategy
@@ -12,6 +13,8 @@ const SUPERDRUG_CUSTOM_FIELDS = {
     marketplace: z.boolean().describe('Marketplace information where the product is sold (e.g., "Sold and shipped by a Marketplace seller")'),
     features: z.string().describe('Text content from the "Features" section. Preserve bullet points as newline-separated plain text. Return empty string if the section is not present.'),
     product_specification: z.string().describe('Text content from the "Product Specification" section. Combine key-value lines as newline-separated plain text. Return empty string if the section is not present.'),
+    warnings_or_restrictions: z.string().describe('Text content from the "Warning or Restrictions" section. Preserve bullet points as newline-separated plain text. Return empty string if the section is not present.'),
+    tips_and_advice: z.string().describe('Text content from the "Tips and Advice" section. Preserve bullet points as newline-separated plain text. Return empty string if the section is not present.'),
 };
 
 
@@ -35,6 +38,25 @@ async function extractSuperdrugProduct(page, urlObj, productName = null, options
             // Define extraction functions inside the browser context
             // Note: productName is passed from generic.js
             
+            function extractName() {
+                // Primary selector per provided structure
+                const h1 = document.querySelector('h1.product-details-title__text');
+                if (h1) {
+                    const t = (h1.textContent || '').replace(/\s+/g, ' ').trim();
+                    if (t) return t;
+                }
+                // Fallback: any heading inside the title container
+                const container = document.querySelector('.product-details-title__container');
+                if (container) {
+                    const any = container.querySelector('h1, h2');
+                    if (any) {
+                        const t = (any.textContent || '').replace(/\s+/g, ' ').trim();
+                        if (t) return t;
+                    }
+                }
+                return '';
+            }
+
             function extractMainImage() {
                 const imageElement = document.querySelector('e2core-media[format="zoom"] img');
                 return imageElement ? (imageElement.src || imageElement.getAttribute('src')) : null;
@@ -265,6 +287,93 @@ async function extractSuperdrugProduct(page, urlObj, productName = null, options
                 return extractSectionTextByHeading('Product Specification');
             }
 
+            function extractWarningsOrRestrictions() {
+                // Target the specific warnings accordion
+                const root = document.querySelector('e2-accordion.product-general-information__section-item--warnings');
+                if (root) {
+                    const body = root.querySelector('.e2-accordion__body [body]');
+                    if (body) {
+                        const items = Array.from(body.querySelectorAll('.product-general-information__section-item-description'))
+                            .map(p => (p.textContent || '').replace(/\s+/g, ' ').trim())
+                            .filter(Boolean);
+                        const text = Array.from(new Set(items)).join('\n');
+                        if (text) return text;
+                    }
+                }
+                
+                // Fallback to generic heading search
+                return extractSectionTextByHeading('Warning or Restrictions');
+            }
+
+            function extractTipsAndAdvice() {
+                // Target the specific tips accordion
+                const root = document.querySelector('e2-accordion.product-general-information__section-item--tips');
+                if (root) {
+                    const body = root.querySelector('.e2-accordion__body [body]');
+                    if (body) {
+                        const items = Array.from(body.querySelectorAll('.product-general-information__section-item-description'))
+                            .map(p => (p.textContent || '').replace(/\s+/g, ' ').trim())
+                            .filter(Boolean);
+                        const text = Array.from(new Set(items)).join('\n');
+                        if (text) return text;
+                    }
+                }
+                
+                // Fallback to generic heading search
+                return extractSectionTextByHeading('Tips and Advice');
+            }
+
+            function extractStockStatus() {
+                try {
+                    // If an Add to Basket progress button exists, consider it In stock
+                    const btn = document.querySelector('button.progress-button.progress-button--has-completed-label[aria-label][type="submit"]');
+                    if (btn) {
+                        const aria = (btn.getAttribute('aria-label') || '').toLowerCase();
+                        const txt = (btn.textContent || '').toLowerCase();
+                        if (aria.includes('add to basket') || txt.includes('add to basket')) {
+                            return 'In stock';
+                        }
+                    }
+                } catch {}
+                return 'Out of stock';
+            }
+
+            function extractDescription() {
+                // Target the specific Product Information accordion
+                const root = document.querySelector('e2-accordion.product-general-information__section-item--information, .product-general-information__section-item--information');
+                if (root) {
+                    const body = root.querySelector('.e2-accordion__body [body]') || root.querySelector('.e2-accordion__body') || root;
+                    if (body) {
+                        // Prefer specific description blocks if present
+                        const items = Array.from(body.querySelectorAll('.product-general-information__section-item-description'))
+                            .map(p => (p.textContent || '').replace(/\s+/g, ' ').trim())
+                            .filter(Boolean);
+                        const text = Array.from(new Set(items)).join('\n');
+                        if (text) return text;
+
+                        // Otherwise, sanitize the whole body content
+                        const wrapper = document.createElement('div');
+                        wrapper.innerHTML = body.innerHTML.replace(/<br\s*\/?>(\s*)/gi, '\n');
+                        const sanitized = (wrapper.textContent || '').replace(/\r?\n\s*\n+/g, '\n')
+                            .split('\n').map(s => s.replace(/\s+/g, ' ').trim()).filter(Boolean).join('\n');
+                        if (sanitized) return sanitized;
+                    }
+                }
+                // Fallback to generic heading search
+                return extractSectionTextByHeading('Product Information');
+            }
+
+            function extractPrice() {
+                try {
+                    const priceEl = document.querySelector('.price__default-value');
+                    if (priceEl) {
+                        const text = (priceEl.textContent || '').replace(/\s+/g, ' ').trim();
+                        if (text) return text;
+                    }
+                } catch {}
+                return '';
+            }
+
             function extractCustomFields(urlObj, allowedFields) {
                 const out = {};
                 if (!allowedFields || allowedFields.has('marketplace')) {
@@ -276,6 +385,12 @@ async function extractSuperdrugProduct(page, urlObj, productName = null, options
                 if (!allowedFields || allowedFields.has('product_specification')) {
                     out.product_specification = extractProductSpecification();
                 }
+                if (!allowedFields || allowedFields.has('warnings_or_restrictions')) {
+                    out.warnings_or_restrictions = extractWarningsOrRestrictions();
+                }
+                if (!allowedFields || allowedFields.has('tips_and_advice')) {
+                    out.tips_and_advice = extractTipsAndAdvice();
+                }
                 return out;
             }
 
@@ -284,12 +399,14 @@ async function extractSuperdrugProduct(page, urlObj, productName = null, options
                     const container = document.querySelector('.breadcrumb-container');
                     if (!container) return [];
 
-                    // Collect visible breadcrumb label texts in order
-                    const nodes = container.querySelectorAll('.breadcrumb-item .breadcrumb-item__text');
-                    const labels = Array.from(nodes)
-                        .map(el => (el.textContent || '').replace(/\s+/g, ' ').trim())
+                    // Only include breadcrumb items that have a clickable link (exclude current product)
+                    const anchors = container.querySelectorAll('.breadcrumb-item a');
+                    const labels = Array.from(anchors)
+                        .map(a => {
+                            const el = a.querySelector('.breadcrumb-item__text') || a;
+                            return (el.textContent || '').replace(/\s+/g, ' ').trim();
+                        })
                         .filter(Boolean)
-                        // Exclude generic "Home" entry
                         .filter(text => text.toLowerCase() !== 'home');
 
                     // Deduplicate while preserving order
@@ -305,19 +422,30 @@ async function extractSuperdrugProduct(page, urlObj, productName = null, options
             }
             
             // Execute extraction
+            const name = (allowedFields && allowedFields.has('name')) ? extractName() : productName;
             const mainImage = (allowedFields && !allowedFields.has('main_image')) ? null : extractMainImage();
             const uniqueImages = (allowedFields && !allowedFields.has('images')) ? [] : extractComprehensiveImageGallery(mainImage, productName);
             const breadcrumbs = (!allowedFields || allowedFields.has('breadcrumbs')) ? extractBreadcrumbs() : [];
+            const description = (!allowedFields || allowedFields.has('description')) ? extractDescription() : '';
+            const stockStatus = (!allowedFields || allowedFields.has('stock_status')) ? extractStockStatus() : '';
+            const price = (!allowedFields || allowedFields.has('price')) ? extractPrice() : '';
             const customFields = extractCustomFields(urlObj, allowedFields);
             const result = {
+                ...(name && name.trim() ? { name } : {}),
                 ...((allowedFields && !allowedFields.has('main_image') && !allowedFields.has('images')) ? {} : { main_image: mainImage, images: uniqueImages }),
                 ...customFields,
+                ...(description && description.trim() ? { description } : {}),
+                ...(stockStatus && stockStatus.trim() ? { stock_status: stockStatus } : {}),
+                ...(price && price.trim() ? { price } : {}),
                 ...(breadcrumbs && breadcrumbs.length > 0 ? { breadcrumbs } : {}),
                 metadata: {
                     extraction_method: 'direct_selectors_with_custom_fields_and_alt_matching',
                     selectors_used: {
-                        name: 'passed_from_generic_js',
+                        name: 'h1.product-details-title__text | container heading fallback | passed_from_generic_js',
                         images: 'e2core-media[format="zoom"] img + alt attribute matching',
+                        price: '.price__default-value',
+                        stock_status: 'progress-button Add to Basket presence',
+                        description: 'Product Information accordion/title',
                         custom_fields: 'sku_based_and_dom_selectors + product-general-information sections'
                     },
                     images_found: uniqueImages.length,
@@ -328,10 +456,7 @@ async function extractSuperdrugProduct(page, urlObj, productName = null, options
                 }
             };
             
-            // Include name if provided
-            if (productName) {
-                result.name = productName;
-            }
+          
             
             return result;
         }, {urlObj, productName, allowedFieldsArray: allowedFields ? Array.from(allowedFields) : null});
@@ -359,6 +484,16 @@ module.exports = {
             const desc = (next.description || '').toString();
             const features = (next.features || '').toString();
             const spec = (next.product_specification || '').toString();
+            const warnings = (next.warnings_or_restrictions || '').toString();
+            const tips = (next.tips_and_advice || '').toString();
+
+            // Extract EAN code from product specification if available
+            if (spec && spec.trim()) {
+                const eanMatch = spec.match(/EAN:\s*(\d+)/i);
+                if (eanMatch && eanMatch[1]) {
+                    next.ean_code = eanMatch[1];
+                }
+            }
 
             const makeSection = (title, content) => {
                 if (!content || !content.trim()) return null; 
@@ -372,13 +507,22 @@ module.exports = {
             if (s2) sections.push(s2);
             const s3 = makeSection('Product Specification', spec);
             if (s3) sections.push(s3);
+            const s4 = makeSection('Warning or Restrictions', warnings);
+            if (s4) sections.push(s4);
+            const s5 = makeSection('Tips and Advice', tips);
+            if (s5) sections.push(s5);
 
             if (sections.length > 0) {
                 next.description = sections.join('\n\n');
             }
+            if (Array.isArray(next.breadcrumbs) && next.breadcrumbs.length > 0) {
+                next.category = next.breadcrumbs[next.breadcrumbs.length - 1].toLowerCase();
+            }
 
             delete next.features;
             delete next.product_specification;
+            delete next.warnings_or_restrictions;
+            delete next.tips_and_advice;
             return next;
         } catch {
             return product;

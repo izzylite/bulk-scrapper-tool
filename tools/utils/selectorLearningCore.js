@@ -176,14 +176,13 @@ async function learnAndCacheSelectors(page, vendor, item) {
         console.log(`[SELECTOR_LEARNING] Page/context is closed, skipping selector learning for ${vendor}`);
         return;
     }
-    
-    const vendorData = loadVendorSelectors()[vendor];
+     
      
     
     const learned = {};
     // Learn selectors for static fields, main_image, stock_status, and breadcrumbs container
     // Truly dynamic fields (like full images array) will always use LLM
-    const baseFieldsToLearn = ['name', 'price', 'main_image', 'weight', 'height', 'length', 'description', 'category', 'stock_status', 'breadcrumbs'];
+    const baseFieldsToLearn = ['name', 'price', 'main_image', 'weight', 'description', 'category', 'stock_status', 'breadcrumbs'];
     
     // Add custom vendor fields that are suitable for selector learning (non-dynamic fields)
     const customFieldNames = Object.keys(getVendorCustomFields(vendor));
@@ -224,8 +223,9 @@ async function learnAndCacheSelectors(page, vendor, item) {
     for (const field of fieldsToProcess) {
         const value = String(item[field] || '').trim();
         
+        // Track the last observe prompt used for better failure diagnostics
+        let observePrompt = null;
         try {
-            let observePrompt;
            
             
             if (field === 'breadcrumbs') {
@@ -368,11 +368,14 @@ async function learnAndCacheSelectors(page, vendor, item) {
                                     }
                                 }
                             } else {
-                                // For text fields, validate by checking inner text
+                                // For text fields, validate by checking inner text with normalization
+                                const normalize = (s) => (s || '').toString().toLowerCase().replace(/\s+/g, ' ').trim();
                                 let testText = '';
                                 try { testText = await page.locator(selector).first().innerText({ timeout: 5000 }); }
                                 catch { try { testText = await page.locator(`pierce=${selector}`).first().innerText({ timeout: 5000 }); } catch {} }
-                                if (testText && (testText.includes(value) || value.includes(testText))) { 
+                                const normTest = normalize(testText);
+                                const normValue = normalize(value);
+                                if (normTest && normValue && (normTest.includes(normValue) || normValue.includes(normTest))) { 
                                     observeResults.push({ field, selector, method: 'observe' });
                                     continue;
                                 }
@@ -416,6 +419,16 @@ async function learnAndCacheSelectors(page, vendor, item) {
         }
         
         console.log(`[SELECTOR_LEARNING] Failed to learn selector for ${field}`);
+        // Structured failure log for downstream analysis
+        try {
+            logError('selector_learning_failed_for_field', {
+                vendor,
+                field,
+                value: value.substring(0, 100),
+                itemKeys: Object.keys(item || {}),
+                observePrompt: observePrompt ? observePrompt.substring(0, 200) : null
+            });
+        } catch {}
         observeResults.push({ field, selector: null, method: 'observe' });
     }
     
@@ -441,6 +454,22 @@ async function learnAndCacheSelectors(page, vendor, item) {
             failedFields: observeResults.filter(r => !r.selector).map(r => r.field)
         });
     }
+}
+
+
+// Helper function to check if a vendor already has learned selectors for a field
+function hasLearnedSelectors(vendor, field) {
+	try {
+		const vendorData = loadVendorSelectors()[vendor];
+		if (!vendorData || !vendorData.selectors) {
+			return false;
+		}
+
+		const fieldSelectors = vendorData.selectors[field];
+		return fieldSelectors && Array.isArray(fieldSelectors) && fieldSelectors.length > 0;
+	} catch (error) {
+		return false;
+	}
 }
 
 module.exports = {
