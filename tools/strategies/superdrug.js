@@ -54,7 +54,7 @@ async function extractSuperdrugProduct(page, urlObj, productName = null, options
                         if (t) return t;
                     }
                 }
-                return '';
+                return productName || "";
             }
 
             function extractMainImage() {
@@ -422,7 +422,7 @@ async function extractSuperdrugProduct(page, urlObj, productName = null, options
             }
             
             // Execute extraction
-            const name = (allowedFields && allowedFields.has('name')) ? extractName() : productName;
+            const name = (allowedFields && !allowedFields.has('name')) ? null : extractName();
             const mainImage = (allowedFields && !allowedFields.has('main_image')) ? null : extractMainImage();
             const uniqueImages = (allowedFields && !allowedFields.has('images')) ? [] : extractComprehensiveImageGallery(mainImage, productName);
             const breadcrumbs = (!allowedFields || allowedFields.has('breadcrumbs')) ? extractBreadcrumbs() : [];

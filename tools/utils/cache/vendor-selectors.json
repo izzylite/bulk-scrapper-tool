@@ -1,7 +1,7 @@
 {
   "superdrug": {
     "last_llm_extraction": {
-      "timestamp": "2025-08-27T20:30:09.306Z",
+      "timestamp": "2025-08-28T08:47:37.177Z",
       "attempted_fields": [
         "name",
         "price",
@@ -198,26 +198,6 @@
           "last_success": "2025-08-25T21:36:56.196Z"
         }
       ],
-      "name": [
-        {
-          "selector": "xpath=/html[1]/body[1]/app-root[1]/cx-storefront[1]/main[1]/cx-page-layout[1]/cx-page-slot[2]/e2-general-container[1]/section[1]/div[1]/e2-children-iterator[1]/e2-general-container[1]/section[1]/div[1]/e2-children-iterator[1]/e2-paragraph[1]/div[1]/div[1]/h1[1]",
-          "learned_at": "2025-08-26T02:51:18.420Z",
-          "success_count": 8,
-          "last_success": "2025-08-26T10:19:14.334Z"
-        },
-        {
-          "selector": "xpath=/html[1]/body[1]/app-root[1]/cx-storefront[1]/main[1]/cx-page-layout[1]/e2-product-outlets[1]/div[1]/section[1]/e2-flex[1]/mp-product-add-to-cart[1]/e2-product-details-title[1]/div[1]/div[1]",
-          "learned_at": "2025-08-26T02:59:49.548Z",
-          "success_count": 10,
-          "last_success": "2025-08-26T04:11:59.795Z"
-        },
-        {
-          "selector": "xpath=/html[1]/body[1]/app-root[1]/cx-storefront[1]/main[1]/cx-page-layout[1]/e2-product-outlets[1]/div[1]/section[1]/cx-page-layout[1]/cx-page-slot[1]/mp-product-add-to-cart[1]/e2-product-details-title[1]/div[1]/h1[1]",
-          "learned_at": "2025-08-26T01:39:47.081Z",
-          "success_count": 10,
-          "last_success": "2025-08-26T01:40:10.981Z"
-        }
-      ],
       "price": [
         {
           "selector": "xpath=/html[1]/body[1]/app-root[1]/cx-storefront[1]/main[1]/cx-page-layout[1]/e2-product-outlets[1]/div[1]/cx-page-layout[1]/cx-page-slot[5]/e2-pwr-reviews[1]/div[1]/div[1]/div[1]/section[1]/section[1]/div[1]/section[1]/section[1]/h3[1]",
@@ -230,6 +210,26 @@
           "learned_at": "2025-08-26T09:44:34.711Z",
           "success_count": 10,
           "last_success": "2025-08-26T13:58:50.676Z"
+        }
+      ],
+      "name": [
+        {
+          "selector": "xpath=/html[1]/body[1]/app-root[1]/cx-storefront[1]/main[1]/cx-page-layout[1]/e2-product-outlets[1]/div[1]/cx-page-layout[1]/cx-page-slot[1]/e2-product-details-section[1]/section[1]/e2-accordion[1]/div[1]/div[2]/div[1]/p[1]",
+          "learned_at": "2025-08-28T08:46:59.674Z",
+          "success_count": 1,
+          "last_success": "2025-08-28T08:46:59.674Z"
+        },
+        {
+          "selector": "xpath=/html[1]/body[1]/app-root[1]/cx-storefront[1]/main[1]/cx-page-layout[1]/e2-product-outlets[1]/div[1]/section[1]/cx-page-layout[1]/cx-page-slot[1]/mp-product-add-to-cart[1]/div[1]/div[2]",
+          "learned_at": "2025-08-28T08:46:25.682Z",
+          "success_count": 1,
+          "last_success": "2025-08-28T08:46:25.682Z"
+        },
+        {
+          "selector": "xpath=/html[1]/body[1]/app-root[1]/cx-storefront[1]/main[1]/cx-page-layout[1]/e2-product-outlets[1]/div[1]/section[1]/cx-page-layout[1]/cx-page-slot[1]/mp-product-add-to-cart[1]/e2-product-details-title[1]/div[1]/h1[1]",
+          "learned_at": "2025-08-28T08:46:23.114Z",
+          "success_count": 1,
+          "last_success": "2025-08-28T08:46:23.114Z"
         }
       ]
     }
